@@ -1,14 +1,25 @@
-import {
-  IsArray,
-  IsEmail,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type } from "class-transformer";
+import { IsOptional, IsInt, IsString, IsEmail, IsArray, ValidateNested } from "class-validator";
 
+
+
+// ---------- Promotion DTO ----------
+export class PromotionCreateDto {
+  @IsOptional() @IsInt() departmentNameID?: number;
+  @IsOptional() @IsInt() designationID?: number;
+  @IsOptional() @IsInt() managerID?: number;
+  @IsOptional() @IsString() employmentType?: string;
+  @IsOptional() @IsString() employmentStatus?: string;
+  @IsOptional() @IsString() probationPeriod?: string;
+  @IsOptional() @IsInt() workShiftID?: number;
+  @IsOptional() @IsInt() attendancePolicyID?: number;
+  @IsOptional() @IsInt() leavePolicyID?: number;
+  @IsOptional() @IsString() salaryPayGradeType?: string;
+  @IsOptional() @IsInt() monthlyPayGradeID?: number;
+  @IsOptional() @IsInt() hourlyPayGradeID?: number;
+}
+
+// ---------- Education DTO ----------
 export class EduCreateDto {
   @IsOptional() @IsString() instituteType?: string;
   @IsOptional() @IsString() instituteName?: string;
@@ -19,6 +30,7 @@ export class EduCreateDto {
   @IsOptional() @IsString() class?: string;
 }
 
+// ---------- Experience DTO ----------
 export class ExpCreateDto {
   @IsOptional() @IsString() orgName?: string;
   @IsOptional() @IsString() designation?: string;
@@ -28,8 +40,9 @@ export class ExpCreateDto {
   @IsOptional() @IsString() skill?: string;
 }
 
+// ---------- Device Mapping DTO ----------
 export class DevMapCreateDto {
-  @IsInt() deviceID!: number;                
+  @IsInt() deviceID!: number;
   @IsOptional() @IsString() deviceEmpCode?: string;
 }
 
@@ -38,26 +51,13 @@ export class CreateManageEmployeeDto {
   @IsOptional() @IsInt() serviceProviderID?: number;
   @IsOptional() @IsInt() companyID?: number;
   @IsOptional() @IsInt() branchesID?: number;
-
-  @IsOptional() @IsInt() departmentNameID?: number;
-  @IsOptional() @IsInt() designationID?: number;
-  @IsOptional() @IsInt() managerID?: number;
   @IsOptional() @IsInt() contractorID?: number;
-  @IsOptional() @IsInt() workShiftID?: number;
-  @IsOptional() @IsInt() attendancePolicyID?: number;
-  @IsOptional() @IsInt() leavePolicyID?: number;
 
   // Scalars
   @IsOptional() @IsString() employeeFirstName?: string;
   @IsOptional() @IsString() employeeLastName?: string;
-  @IsOptional() @IsString() deviceEmployeeCode?: string;
   @IsOptional() @IsString() employeeID?: string;
-
   @IsOptional() @IsString() joiningDate?: string;
-  @IsOptional() @IsString() employmentType?: string;
-  @IsOptional() @IsString() employmentStatus?: string;
-  @IsOptional() @IsString() probationPeriod?: string;
-  @IsOptional() @IsString() salaryPayGradeType?: string;
 
   @IsOptional() @IsString() businessPhoneNo?: string;
   @IsOptional() @IsEmail() businessEmail?: string;
@@ -92,4 +92,10 @@ export class CreateManageEmployeeDto {
   @ValidateNested({ each: true })
   @Type(() => DevMapCreateDto)
   devices?: DevMapCreateDto[];
+
+  // Promotion (1:1 relation)
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PromotionCreateDto)
+  promotion?: PromotionCreateDto;
 }

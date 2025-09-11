@@ -37,6 +37,23 @@ interface CO { id: ID; companyName?: string | null; }
 interface BR { id: ID; branchName?: string | null; }
 interface Device { id: ID; deviceName?: string | null; }
 
+type PromotionForm = {
+  id?: number;
+  departmentNameID: number | null;
+  designationID: number | null;
+  managerID: number | null;
+  employmentType: string;
+  employmentStatus: string;
+  probationPeriod: string;
+  workShiftID: number | null;
+  attendancePolicyID: number | null;
+  leavePolicyID: number | null;
+  salaryPayGradeType: string;
+  monthlyPayGradeID: number | null;
+  hourlyPayGradeID: number | null;
+};
+
+
 interface EduRead {
   id: ID;
   instituteType?: string | null;
@@ -58,7 +75,7 @@ interface ExpRead {
 }
 interface DevMapRead {
   id: ID;
-  manageEmployeeID?:number | null;
+  manageEmployeeID?: number | null;
   deviceID?: number | null;
   deviceEmpCode?: string | null;
   device?: { id: ID; deviceName?: string | null } | null;
@@ -196,7 +213,7 @@ async function resolveLabelsForEdit(r: ManageEmpRead, setFormData: React.Dispatc
     const devMapForm = (prev.devMapForm || []).map((d: any) => {
       if (d.deviceName) return d; // already had it from API
       const match = (devicesList || []).find((dv) => dv.id === Number(d.deviceID));
-      return { ...d, deviceName: match?.deviceName ?? "", _devAutocomplete: match?.deviceName ?? "",deviceEmpCode: d.deviceEmpCode ?? "" };
+      return { ...d, deviceName: match?.deviceName ?? "", _devAutocomplete: match?.deviceName ?? "", deviceEmpCode: d.deviceEmpCode ?? "" };
     });
 
     return {
@@ -355,6 +372,23 @@ export function ManageEmployeesManagement() {
     wsAutocomplete: "",
     apAutocomplete: "",
     lpAutocomplete: "",
+
+    promotion: {
+      id: undefined,
+      departmentNameID: null,
+      designationID: null,
+      managerID: null,
+      employmentType: "",
+      employmentStatus: "",
+      probationPeriod: "",
+      workShiftID: null,
+      attendancePolicyID: null,
+      leavePolicyID: null,
+      salaryPayGradeType: "",
+      monthlyPayGradeID: null,
+      hourlyPayGradeID: null,
+    } as PromotionForm,
+
 
 
     // nested arrays
@@ -796,6 +830,22 @@ export function ManageEmployeesManagement() {
       apAutocomplete: "",
       lpAutocomplete: "",
 
+      promotion: {
+        id: undefined,
+        departmentNameID: null,
+        designationID: null,
+        managerID: null,
+        employmentType: "",
+        employmentStatus: "",
+        probationPeriod: "",
+        workShiftID: null,
+        attendancePolicyID: null,
+        leavePolicyID: null,
+        salaryPayGradeType: "",
+        monthlyPayGradeID: null,
+        hourlyPayGradeID: null,
+      },
+
 
       eduForm: [],
       expForm: [],
@@ -873,23 +923,11 @@ export function ManageEmployeesManagement() {
         companyID: formData.companyID ?? undefined,
         branchesID: formData.branchesID ?? undefined,
 
+        // Scalars that belong to ManageEmployee (keep only those that still live on ManageEmployee)
         employeeFirstName: formData.employeeFirstName || undefined,
         employeeLastName: formData.employeeLastName || undefined,
-        deviceEmpCode: formData.deviceEmpCode || undefined,
         employeeID: formData.employeeID || undefined,
-        departmentNameID: formData.departmentNameID ?? undefined,
-        designationID: formData.designationID ?? undefined,
-        managerID: formData.managerID ?? undefined,
         joiningDate: formData.joiningDate || undefined,
-
-        employmentType: formData.employmentType || undefined,
-        employmentStatus: formData.employmentStatus || undefined,
-        contractorID: formData.contractorID ?? undefined,
-        probationPeriod: formData.probationPeriod || undefined,
-        workShiftID: formData.workShiftID ?? undefined,
-        attendancePolicyID: formData.attendancePolicyID ?? undefined,
-        leavePolicyID: formData.leavePolicyID ?? undefined,
-        salaryPayGradeType: formData.salaryPayGradeType || undefined,
 
         businessPhoneNo: formData.businessPhoneNo || undefined,
         businessEmail: formData.businessEmail || undefined,
@@ -908,17 +946,36 @@ export function ManageEmployeesManagement() {
         employeeMotherName: formData.employeeMotherName || undefined,
         employeeSpouseName: formData.employeeSpouseName || undefined,
 
-        // nested
+        // Nested arrays (names expected by backend DTO)
         edu,
         exp,
-        empDeviceMapping: devices,
+        devices, // <-- IMPORTANT: send as `devices`, not empDeviceMapping
 
+        // Promotion — moved into its own table on backend
+        promotion: {
+          id: formData.promotion?.id,
+          departmentNameID: formData.promotion?.departmentNameID ?? undefined,
+          designationID: formData.promotion?.designationID ?? undefined,
+          managerID: formData.promotion?.managerID ?? undefined,
+          employmentType: formData.promotion?.employmentType || undefined,
+          employmentStatus: formData.promotion?.employmentStatus || undefined,
+          probationPeriod: formData.promotion?.probationPeriod || undefined,
+          workShiftID: formData.promotion?.workShiftID ?? undefined,
+          attendancePolicyID: formData.promotion?.attendancePolicyID ?? undefined,
+          leavePolicyID: formData.promotion?.leavePolicyID ?? undefined,
+          salaryPayGradeType: formData.promotion?.salaryPayGradeType || undefined,
+          monthlyPayGradeID: formData.promotion?.monthlyPayGradeID ?? undefined,
+          hourlyPayGradeID: formData.promotion?.hourlyPayGradeID ?? undefined,
+        },
+
+        // Deletions when editing (names expected by UpdateManageEmployeeDto)
         ...(editingRow ? {
           eduIdsToDelete: originalEduIds.filter(id => !eduRemaining.has(id)),
           expIdsToDelete: originalExpIds.filter(id => !expRemaining.has(id)),
-  empDeviceMappingIdsToDelete: originalDevMapIds.filter(id => !devRemaining.has(id)), // <- rename too
+          deviceMapIdsToDelete: originalDevMapIds.filter(id => !devRemaining.has(id)), // <-- correct key
         } : {}),
       };
+
 
       if (editingRow) {
         const res = await fetch(`${API.manageEmp}/${editingRow.id}`, {
@@ -980,6 +1037,11 @@ export function ManageEmployeesManagement() {
       deviceName: d.device?.deviceName ?? "",
     }));
 
+    const latestPromotion =
+      (r as any).empPromotion && (r as any).empPromotion.length
+        ? [...(r as any).empPromotion].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0))[0]
+        : null;
+
     setFormData({
       serviceProviderID: r.serviceProviderID ?? r.serviceProvider?.id ?? null,
       companyID: r.companyID ?? r.company?.id ?? null,
@@ -1026,14 +1088,45 @@ export function ManageEmployeesManagement() {
 
       deptAutocomplete: r.departmentNameID ? String(r.departmentNameID) : "", // or pre-fill with fetched name if your GET :id includes dept
       desgAutocomplete: r.designationID ? String(r.designationID) : "",
- contrAutocomplete:
-    r.contractor?.contractorName ??
-    r.contractorName ??
-    (r.contractorID ? String(r.contractorID) : ""),
-          mgrAutocomplete: r.managerID ? String(r.managerID) : "",
+      contrAutocomplete:
+        r.contractor?.contractorName ??
+        r.contractorName ??
+        (r.contractorID ? String(r.contractorID) : ""),
+      mgrAutocomplete: r.managerID ? String(r.managerID) : "",
       wsAutocomplete: r.workShiftID ? String(r.workShiftID) : "",
       apAutocomplete: r.attendancePolicyID ? String(r.attendancePolicyID) : "",
       lpAutocomplete: r.leavePolicyID ? String(r.leavePolicyID) : "",
+
+      promotion: latestPromotion ? {
+        id: latestPromotion.id,                         // keep id for UPDATE path
+        departmentNameID: latestPromotion.departmentNameID ?? null,
+        designationID: latestPromotion.designationID ?? null,
+        managerID: latestPromotion.managerID ?? null,
+        employmentType: latestPromotion.employmentType ?? "",
+        employmentStatus: latestPromotion.employmentStatus ?? "",
+        probationPeriod: latestPromotion.probationPeriod ?? "",
+        workShiftID: latestPromotion.workShiftID ?? null,
+        attendancePolicyID: latestPromotion.attendancePolicyID ?? null,
+        leavePolicyID: latestPromotion.leavePolicyID ?? null,
+        salaryPayGradeType: latestPromotion.salaryPayGradeType ?? "",
+        monthlyPayGradeID: latestPromotion.monthlyPayGradeID ?? null,
+        hourlyPayGradeID: latestPromotion.hourlyPayGradeID ?? null,
+      } : {
+        id: undefined,
+        departmentNameID: null,
+        designationID: null,
+        managerID: null,
+        employmentType: "",
+        employmentStatus: "",
+        probationPeriod: "",
+        workShiftID: null,
+        attendancePolicyID: null,
+        leavePolicyID: null,
+        salaryPayGradeType: "",
+        monthlyPayGradeID: null,
+        hourlyPayGradeID: null,
+      },
+
 
 
       eduForm,
@@ -1279,13 +1372,7 @@ export function ManageEmployeesManagement() {
 
               {/* Codes / Date */}
               <div className="grid grid-cols-3 gap-4">
-                {/* <div className="space-y-2">
-                  <Label>Device Employee Code</Label>
-                  <Input
-                    value={formData.deviceEmpCode}
-                    onChange={(e) => setFormData((p) => ({ ...p, deviceEmpCode: e.target.value }))}
-                  />
-                </div> */}
+
                 <div className="space-y-2">
                   <Label>Joining Date</Label>
                   <Input
@@ -1297,11 +1384,19 @@ export function ManageEmployeesManagement() {
                 <div className="space-y-2">
                   <Label>Salary Pay Grade Type</Label>
                   <Input
-                    value={formData.salaryPayGradeType}
-                    onChange={(e) => setFormData((p) => ({ ...p, salaryPayGradeType: e.target.value }))}
+                    value={formData.promotion.salaryPayGradeType}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        salaryPayGradeType: val,                         // optional: keep for backward-compat
+                        promotion: { ...p.promotion, salaryPayGradeType: val },
+                      }));
+                    }}
                     placeholder="Monthly / Hourly / …"
                   />
                 </div>
+
               </div>
 
               {/* IDs & employment */}
@@ -1311,23 +1406,38 @@ export function ManageEmployeesManagement() {
                   value={formData.deptAutocomplete}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setFormData((p) => ({ ...p, deptAutocomplete: val, departmentNameID: null }));
+                    setFormData((p) => ({
+                      ...p,
+                      deptAutocomplete: val,
+                      departmentNameID: null,                          // clear root
+                      promotion: { ...p.promotion, departmentNameID: null }, // clear promotion side too
+                    }));
                     runFetchDept(val);
                   }}
-                  onFocus={(e) => { const val = e.target.value; if (val.length >= MIN_CHARS) runFetchDept(val); }}
+                  onFocus={(e) => {
+                    const val = e.target.value;
+                    if (val.length >= MIN_CHARS) runFetchDept(val);
+                  }}
                   placeholder="Start typing department…"
                   autoComplete="off"
                 />
                 {deptList.length > 0 && (
                   <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                    {deptLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                    {deptLoading && (
+                      <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
+                    )}
                     {deptList.map((d) => (
                       <div
                         key={d.id}
                         className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          setFormData((p) => ({ ...p, departmentNameID: d.id, deptAutocomplete: d.departmentName ?? String(d.id) }));
+                          setFormData((p) => ({
+                            ...p,
+                            departmentNameID: d.id,
+                            deptAutocomplete: d.departmentName ?? String(d.id),
+                            promotion: { ...p.promotion, departmentNameID: d.id },
+                          }));
                           setDeptList([]);
                         }}
                       >
@@ -1339,6 +1449,7 @@ export function ManageEmployeesManagement() {
               </div>
 
 
+
               {/* Designation */}
               <div ref={desgRef} className="space-y-2 relative">
                 <Label>Designation</Label>
@@ -1346,10 +1457,18 @@ export function ManageEmployeesManagement() {
                   value={formData.desgAutocomplete}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setFormData((p) => ({ ...p, desgAutocomplete: val, designationID: null }));
+                    setFormData((p) => ({
+                      ...p,
+                      desgAutocomplete: val,
+                      designationID: null,
+                      promotion: { ...p.promotion, designationID: null },
+                    }));
                     runFetchDesg(val);
                   }}
-                  onFocus={(e) => { const val = e.target.value; if (val.length >= MIN_CHARS) runFetchDesg(val); }}
+                  onFocus={(e) => {
+                    const val = e.target.value;
+                    if (val.length >= MIN_CHARS) runFetchDesg(val);
+                  }}
                   placeholder="Start typing designation…"
                   autoComplete="off"
                 />
@@ -1362,7 +1481,12 @@ export function ManageEmployeesManagement() {
                         className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          setFormData((p) => ({ ...p, designationID: d.id, desgAutocomplete: d.designantion ?? String(d.id) }));
+                          setFormData((p) => ({
+                            ...p,
+                            designationID: d.id,
+                            desgAutocomplete: d.designantion ?? String(d.id),
+                            promotion: { ...p.promotion, designationID: d.id },
+                          }));
                           setDesgList([]);
                         }}
                       >
@@ -1373,16 +1497,25 @@ export function ManageEmployeesManagement() {
                 )}
               </div>
 
+
               <div ref={mgrRef} className="space-y-2 relative">
                 <Label>Manager</Label>
                 <Input
                   value={formData.mgrAutocomplete}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setFormData((p) => ({ ...p, mgrAutocomplete: val, managerID: null }));
+                    setFormData((p) => ({
+                      ...p,
+                      mgrAutocomplete: val,
+                      managerID: null,
+                      promotion: { ...p.promotion, managerID: null },
+                    }));
                     runFetchMgr(val);
                   }}
-                  onFocus={(e) => { const val = e.target.value; if (val.length >= MIN_CHARS) runFetchMgr(val); }}
+                  onFocus={(e) => {
+                    const val = e.target.value;
+                    if (val.length >= MIN_CHARS) runFetchMgr(val);
+                  }}
                   placeholder="Start typing manager…"
                   autoComplete="off"
                 />
@@ -1397,7 +1530,12 @@ export function ManageEmployeesManagement() {
                           className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
-                            setFormData((p) => ({ ...p, managerID: m.id, mgrAutocomplete: full }));
+                            setFormData((p) => ({
+                              ...p,
+                              managerID: m.id,
+                              mgrAutocomplete: full,
+                              promotion: { ...p.promotion, managerID: m.id },
+                            }));
                             setMgrList([]);
                           }}
                         >
@@ -1409,22 +1547,33 @@ export function ManageEmployeesManagement() {
                 )}
               </div>
 
+
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Employment Type</Label>
                   <Input
-                    value={formData.employmentType}
-                    onChange={(e) => setFormData((p) => ({ ...p, employmentType: e.target.value }))}
-                    placeholder="Company / Contract"
+                    value={formData.promotion.employmentType}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        promotion: { ...p.promotion, employmentType: e.target.value },
+                      }))
+                    }
                   />
+
                 </div>
                 <div className="space-y-2">
                   <Label>Employment Status</Label>
                   <Input
-                    value={formData.employmentStatus}
-                    onChange={(e) => setFormData((p) => ({ ...p, employmentStatus: e.target.value }))}
-                    placeholder="Probation / Permanent"
+                    value={formData.promotion.employmentStatus}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        promotion: { ...p.promotion, employmentStatus: e.target.value },
+                      }))
+                    }
                   />
+
                 </div>
                 {/* Contractor  */}
                 <div ref={contrRef} className="space-y-2 relative">
@@ -1477,10 +1626,18 @@ export function ManageEmployeesManagement() {
                     value={formData.wsAutocomplete}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setFormData((p) => ({ ...p, wsAutocomplete: val, workShiftID: null }));
+                      setFormData((p) => ({
+                        ...p,
+                        wsAutocomplete: val,
+                        workShiftID: null,
+                        promotion: { ...p.promotion, workShiftID: null },
+                      }));
                       runFetchWS(val);
                     }}
-                    onFocus={(e) => { const val = e.target.value; if (val.length >= MIN_CHARS) runFetchWS(val); }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchWS(val);
+                    }}
                     placeholder="Start typing work shift…"
                     autoComplete="off"
                   />
@@ -1493,7 +1650,12 @@ export function ManageEmployeesManagement() {
                           className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
-                            setFormData((p) => ({ ...p, workShiftID: w.id, wsAutocomplete: w.workShiftName ?? String(w.id) }));
+                            setFormData((p) => ({
+                              ...p,
+                              workShiftID: w.id,
+                              wsAutocomplete: w.workShiftName ?? String(w.id),
+                              promotion: { ...p.promotion, workShiftID: w.id },
+                            }));
                             setWsList([]);
                           }}
                         >
@@ -1503,6 +1665,7 @@ export function ManageEmployeesManagement() {
                     </div>
                   )}
                 </div>
+
                 {/* Attendance Policy */}
                 <div ref={apRef} className="space-y-2 relative">
                   <Label>Attendance Policy</Label>
@@ -1510,10 +1673,18 @@ export function ManageEmployeesManagement() {
                     value={formData.apAutocomplete}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setFormData((p) => ({ ...p, apAutocomplete: val, attendancePolicyID: null }));
+                      setFormData((p) => ({
+                        ...p,
+                        apAutocomplete: val,
+                        attendancePolicyID: null,
+                        promotion: { ...p.promotion, attendancePolicyID: null },
+                      }));
                       runFetchAP(val);
                     }}
-                    onFocus={(e) => { const val = e.target.value; if (val.length >= MIN_CHARS) runFetchAP(val); }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchAP(val);
+                    }}
                     placeholder="Start typing attendance policy…"
                     autoComplete="off"
                   />
@@ -1526,7 +1697,12 @@ export function ManageEmployeesManagement() {
                           className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
-                            setFormData((p) => ({ ...p, attendancePolicyID: a.id, apAutocomplete: a.attendancePolicyName ?? String(a.id) }));
+                            setFormData((p) => ({
+                              ...p,
+                              attendancePolicyID: a.id,
+                              apAutocomplete: a.attendancePolicyName ?? String(a.id),
+                              promotion: { ...p.promotion, attendancePolicyID: a.id },
+                            }));
                             setApList([]);
                           }}
                         >
@@ -1536,6 +1712,7 @@ export function ManageEmployeesManagement() {
                     </div>
                   )}
                 </div>
+
                 {/* Leave Policy */}
                 <div ref={lpRef} className="space-y-2 relative">
                   <Label>Leave Policy</Label>
@@ -1543,10 +1720,18 @@ export function ManageEmployeesManagement() {
                     value={formData.lpAutocomplete}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setFormData((p) => ({ ...p, lpAutocomplete: val, leavePolicyID: null }));
+                      setFormData((p) => ({
+                        ...p,
+                        lpAutocomplete: val,
+                        leavePolicyID: null,
+                        promotion: { ...p.promotion, leavePolicyID: null },
+                      }));
                       runFetchLP(val);
                     }}
-                    onFocus={(e) => { const val = e.target.value; if (val.length >= MIN_CHARS) runFetchLP(val); }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchLP(val);
+                    }}
                     placeholder="Start typing leave policy…"
                     autoComplete="off"
                   />
@@ -1559,7 +1744,12 @@ export function ManageEmployeesManagement() {
                           className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
-                            setFormData((p) => ({ ...p, leavePolicyID: l.id, lpAutocomplete: l.leavePolicyName ?? String(l.id) }));
+                            setFormData((p) => ({
+                              ...p,
+                              leavePolicyID: l.id,
+                              lpAutocomplete: l.leavePolicyName ?? String(l.id),
+                              promotion: { ...p.promotion, leavePolicyID: l.id },
+                            }));
                             setLpList([]);
                           }}
                         >
@@ -1569,6 +1759,7 @@ export function ManageEmployeesManagement() {
                     </div>
                   )}
                 </div>
+
               </div>
 
               {/* Contacts */}
@@ -1619,9 +1810,15 @@ export function ManageEmployeesManagement() {
                 <div className="space-y-2">
                   <Label>Probation Period</Label>
                   <Input
-                    value={formData.probationPeriod}
-                    onChange={(e) => setFormData((p) => ({ ...p, probationPeriod: e.target.value }))}
+                    value={formData.promotion.probationPeriod}
+                    onChange={(e) =>
+                      setFormData((p) => ({
+                        ...p,
+                        promotion: { ...p.promotion, probationPeriod: e.target.value },
+                      }))
+                    }
                   />
+
                 </div>
               </div>
 
@@ -1926,24 +2123,24 @@ export function ManageEmployeesManagement() {
                           )}
                         </div>
 
-                 <div className="space-y-2">
-{formData.devMapForm.map((d: DevMapForm) => (
-  <div key={d._localId}>
-    <Label>Device Employee Code</Label>
-    <Input
-      value={d.deviceEmpCode}
-      onChange={(e) =>
-        updateDevMap(d._localId, "deviceEmpCode", e.target.value)
-      }
-      placeholder="Device Employee Code"
-      autoComplete="off"
-    />
-  </div>
-))}
+                        <div className="space-y-2">
+                          {formData.devMapForm.map((d: DevMapForm) => (
+                            <div key={d._localId}>
+                              <Label>Device Employee Code</Label>
+                              <Input
+                                value={d.deviceEmpCode}
+                                onChange={(e) =>
+                                  updateDevMap(d._localId, "deviceEmpCode", e.target.value)
+                                }
+                                placeholder="Device Employee Code"
+                                autoComplete="off"
+                              />
+                            </div>
+                          ))}
 
-</div>
+                        </div>
 
-                  
+
                       </div>
                     </div>
                   ))

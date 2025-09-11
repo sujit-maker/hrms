@@ -14,7 +14,6 @@ import { WorkShiftModule } from './work-shift/work-shift.module';
 import { AttendancePolicyModule } from './attendance-policy/attendance-policy.module';
 import { ManageHolidayModule } from './manage-holiday/manage-holiday.module';
 import { PublicHolidayModule } from './public-holiday/public-holiday.module';
-import { LeavePolicyModule } from './leave-policy/leave-policy.module';
 import { LeaveApplicationRequestModule } from './leave-application-request/leave-application-request.module';
 import { FilesModule } from './files/files.module';
 import { DevicesModule } from './devices/devices.module';
@@ -41,7 +40,6 @@ import { PromotionRequestModule } from './promotion-request/promotion-request.mo
     AttendancePolicyModule,
     ManageHolidayModule,
     PublicHolidayModule,
-    LeavePolicyModule,
     LeaveApplicationRequestModule,
     FilesModule,
     DevicesModule,

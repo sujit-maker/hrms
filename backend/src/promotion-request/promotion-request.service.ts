@@ -46,7 +46,6 @@ export class PromotionRequestService {
       manageEmployee: data.manageEmployeeID ? { connect: { id: data.manageEmployeeID } } : undefined,
 
       applied_at: new Date(),
-      created_at: new Date(),
       updated_at: new Date(),
       // approved_* left null until actual approval
     };

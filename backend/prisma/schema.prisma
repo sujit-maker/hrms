@@ -24,26 +24,26 @@ model AttendancePolicy {
   branches                    Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company                     Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider             ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  manageEmployee              ManageEmployee[]
+  empPromotion                EmpPromotion[]
 }
 
 model BankDetails {
-  id                Int              @id @default(autoincrement())
+  id                Int     @id @default(autoincrement())
   serviceProviderID Int?
   companyID         Int?
-  branchesID        Int              // <- make required
-  bankName          String?          @db.VarChar
-  bankBranchName    String?          @db.VarChar
-  accountNo         String?          @db.VarChar
-  ifscCode          String?          @db.VarChar
+  branchesID        Int // <- make required
+  bankName          String? @db.VarChar
+  bankBranchName    String? @db.VarChar
+  accountNo         String? @db.VarChar
+  ifscCode          String? @db.VarChar
 
-  branches          Branches         @relation(fields: [branchesID], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-    @@index([branchesID])
+  branches        Branches         @relation(fields: [branchesID], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  company         Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceProvider ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   // Optional: prevent duplicates per branch
   // @@unique([branchesID, accountNo])
+
+  @@index([branchesID])
 }
 
 model BonusSetup {
@@ -111,8 +111,6 @@ model Branches {
   workShift                    WorkShift[]
   devices                      Devices[]
 }
-
-
 
 model Company {
   id                           Int                            @id @default(autoincrement())
@@ -202,7 +200,7 @@ model Departments {
   company                                                             Company?             @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider                                                     ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   empCurrentPosition                                                  EmpCurrentPosition[]
-  manageEmployee                                                      ManageEmployee[]
+  empPromotion                                                        EmpPromotion[]
   promotionRequest_promotionRequest_currentDepartmentIDTodepartments  PromotionRequest[]   @relation("promotionRequest_currentDepartmentIDTodepartments")
   promotionRequest_promotionRequest_proposedDepartmentIDTodepartments PromotionRequest[]   @relation("promotionRequest_proposedDepartmentIDTodepartments")
 }
@@ -217,7 +215,7 @@ model Designations {
   company                                                               Company?             @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider                                                       ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   empCurrentPosition                                                    EmpCurrentPosition[]
-  manageEmployee                                                        ManageEmployee[]
+  empPromotion                                                          EmpPromotion[]
   promotionRequest_promotionRequest_currentDesignationIDTodesignations  PromotionRequest[]   @relation("promotionRequest_currentDesignationIDTodesignations")
   promotionRequest_promotionRequest_proposedDesignationIDTodesignations PromotionRequest[]   @relation("promotionRequest_proposedDesignationIDTodesignations")
 }
@@ -230,28 +228,27 @@ enum DeviceStatus {
 
 // ----- model -----
 model Devices {
-  id                Int           @id @default(autoincrement())
-  status            DeviceStatus  @default(Active)
+  id     Int          @id @default(autoincrement())
+  status DeviceStatus @default(Active)
 
   serviceProviderID Int?
   companyID         Int?
   branchesID        Int?
 
-  deviceName        String        @db.VarChar
-  deviceMake        String        @db.VarChar
-  deviceModel       String        @db.VarChar
-  deviceSN          String        @db.VarChar
+  deviceName  String @db.VarChar
+  deviceMake  String @db.VarChar
+  deviceModel String @db.VarChar
+  deviceSN    String @db.VarChar
 
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // relations
-  empDeviceMapping  EmpDeviceMapping[]
-  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  company           Company?         @relation(fields: [companyID], references: [id], onDelete: SetNull, onUpdate: NoAction)
-  branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  empDeviceMapping EmpDeviceMapping[]
+  serviceProvider  ServiceProvider?   @relation(fields: [serviceProviderID], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  company          Company?           @relation(fields: [companyID], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  branches         Branches?          @relation(fields: [branchesID], references: [id], onDelete: SetNull, onUpdate: NoAction)
 }
-
 
 model EmpAttendanceRegularise {
   id                Int              @id @default(autoincrement())
@@ -270,55 +267,53 @@ model EmpAttendanceRegularise {
 }
 
 model EmpCurrentPosition {
-  id                       Int              @id @default(autoincrement())
-  serviceProviderID        Int?
-  companyID                Int?
-  branchesID               Int?
-  manageEmployeeID         Int?
+  id                        Int              @id @default(autoincrement())
+  serviceProviderID         Int?
+  companyID                 Int?
+  branchesID                Int?
+  manageEmployeeID          Int?
   existingDepartmentID      Int?
   existingDesignationID     Int?
   existingMonthlyPayGradeID Int?
   existingHourlyPayGradeID  Int?
   existingSalaryCtc         Int?
   existingEmploymentType    Int?
-  effectiveFrom            DateTime?        @db.Date
-  effectiveTo              DateTime?        @db.Date
-  createdAt                DateTime?        @db.Timestamp(6)
-  branches                 Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  company                  Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  departments              Departments?     @relation(fields: [existingDepartmentID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  designations             Designations?    @relation(fields: [existingDesignationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  hourlyPayGrade           HourlyPayGrade?  @relation(fields: [existingHourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  monthlyPayGrade          MonthlyPayGrade? @relation(fields: [existingMonthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  manageEmployee           ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  serviceProvider          ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  effectiveFrom             DateTime?        @db.Date
+  effectiveTo               DateTime?        @db.Date
+  createdAt                 DateTime?        @db.Timestamp(6)
+  branches                  Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company                   Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  departments               Departments?     @relation(fields: [existingDepartmentID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations              Designations?    @relation(fields: [existingDesignationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hourlyPayGrade            HourlyPayGrade?  @relation(fields: [existingHourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  monthlyPayGrade           MonthlyPayGrade? @relation(fields: [existingMonthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee            ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceProvider           ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model PromotionRequest {
   id                                                                          Int              @id @default(autoincrement())
   manageEmployeeID                                                            Int?
   empID                                                                       String?          @db.VarChar
-  newDepartmentID                                                         Int?
-  newDesignationID                                                        Int?
-  newMonthlyPayGradeID                                                    Int?
-  newHourlyPayGradeID                                                     Int?
-  newSalaryCtc                                                            Int?
-  newEmploymentType                                                       Int?
-  newEmployementStatus                                                     String?          @db.VarChar
+  newDepartmentID                                                             Int?
+  newDesignationID                                                            Int?
+  newMonthlyPayGradeID                                                        Int?
+  newHourlyPayGradeID                                                         Int?
+  newSalaryCtc                                                                Int?
+  newEmploymentType                                                           Int?
+  newEmployementStatus                                                        String?          @db.VarChar
   proposedDepartmentID                                                        Int?
   proposedDesignationID                                                       Int?
   proposedMonthlyPayGradeID                                                   Int?
   proposedHourlyPayGradeID                                                    Int?
   proposedSalaryCtc                                                           Int?
   proposedEmploymentType                                                      Int?
+  
   description                                                                 String?          @db.VarChar
   promotionDate                                                               DateTime?        @db.Date
   status                                                                      String?          @db.VarChar
   applied_at                                                                  DateTime?        @db.Timestamptz(6)
   approved_at                                                                 DateTime?        @db.Timestamptz(6)
-  approved_by_user_id                                                         Int?           @default(autoincrement())
-  created_by_user_id                                                          Int?           @default(autoincrement())
-  created_at                                                                  DateTime?        @db.Timestamptz(6)
   updated_at                                                                  DateTime?        @db.Timestamptz(6)
   departments_promotionRequest_currentDepartmentIDTodepartments               Departments?     @relation("promotionRequest_currentDepartmentIDTodepartments", fields: [newDepartmentID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   designations_promotionRequest_currentDesignationIDTodesignations            Designations?    @relation("promotionRequest_currentDesignationIDTodesignations", fields: [newDesignationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -329,9 +324,8 @@ model PromotionRequest {
   designations_promotionRequest_proposedDesignationIDTodesignations           Designations?    @relation("promotionRequest_proposedDesignationIDTodesignations", fields: [proposedDesignationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   hourlyPayGrade_promotionRequest_proposedHourlyPayGradeIDTohourlyPayGrade    HourlyPayGrade?  @relation("promotionRequest_proposedHourlyPayGradeIDTohourlyPayGrade", fields: [proposedHourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   monthlyPayGrade_promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade MonthlyPayGrade? @relation("promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade", fields: [proposedMonthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
 }
-
-
 
 model EmpFieldSiteAttendance {
   id                Int              @id @default(autoincrement())
@@ -350,8 +344,6 @@ model EmpFieldSiteAttendance {
   manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
-
-
 
 model GenarateBonus {
   id                Int               @id @default(autoincrement())
@@ -382,6 +374,7 @@ model HourlyPayGrade {
   serviceProvider                                                            ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   promotionRequest_promotionRequest_currentHourlyPayGradeIDTohourlyPayGrade  PromotionRequest[]   @relation("promotionRequest_currentHourlyPayGradeIDTohourlyPayGrade")
   promotionRequest_promotionRequest_proposedHourlyPayGradeIDTohourlyPayGrade PromotionRequest[]   @relation("promotionRequest_proposedHourlyPayGradeIDTohourlyPayGrade")
+  empPromotion                                                               EmpPromotion[]
 }
 
 model leaveApplication {
@@ -432,7 +425,8 @@ model leavePolicy {
   company                Company?             @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider        ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   leavePolicyHoliday     leavePolicyHoliday[]
-  manageEmployee         ManageEmployee[]
+  empPromotion           EmpPromotion[]
+
 }
 
 model leavePolicyHoliday {
@@ -457,18 +451,8 @@ model ManageEmployee {
   employeeFirstName       String?                   @db.VarChar
   employeeLastName        String?                   @db.VarChar
   employeeID              String?                   @db.VarChar
-  departmentNameID        Int?
-  designationID           Int?
-  managerID               Int?
   joiningDate             String?                   @db.VarChar
-  employmentType          String?                   @db.VarChar
-  employmentStatus        String?                   @db.VarChar
   contractorID            Int?
-  probationPeriod         String?                   @db.VarChar
-  workShiftID             Int?
-  attendancePolicyID      Int?
-  leavePolicyID           Int?
-  salaryPayGradeType      String?                   @db.VarChar
   businessPhoneNo         String?                   @db.VarChar
   businessEmail           String?                   @db.VarChar
   personalPhoneNo         String?                   @db.VarChar
@@ -491,78 +475,87 @@ model ManageEmployee {
   empFieldSiteAttendance  EmpFieldSiteAttendance[]
   empProfExprience        EmpProfExprience[]
   leaveApplication        leaveApplication[]
-  attendancePolicy        AttendancePolicy?         @relation(fields: [attendancePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   branches                Branches?                 @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company                 Company?                  @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   contractors             Contractors?              @relation(fields: [contractorID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  departments             Departments?              @relation(fields: [departmentNameID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  designations            Designations?             @relation(fields: [designationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  leavePolicy             leavePolicy?              @relation(fields: [leavePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  manageEmployee          ManageEmployee?           @relation("manageEmployeeTomanageEmployee", fields: [managerID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  other_manageEmployee    ManageEmployee[]          @relation("manageEmployeeTomanageEmployee")
   serviceProvider         ServiceProvider?          @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  workShift               WorkShift?                @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   promotionRequest        PromotionRequest[]
   empPromotion            EmpPromotion[]
 }
 
-model EmpPromotion{
-  id                Int              @id @default(autoincrement())
-  manageEmployeeID  Int?
-  
+model EmpPromotion {
+  id                 Int          @id @default(autoincrement())
+  manageEmployeeID   Int
+  departmentNameID   Int?
+  designationID      Int?
+  managerID          Int?
+  employmentType     String?      @db.VarChar
+  employmentStatus   String?      @db.VarChar
+  probationPeriod    String?      @db.VarChar
+  workShiftID        Int?
+  attendancePolicyID Int?
+  leavePolicyID      Int?
+  salaryPayGradeType String?      @db.VarChar
+  monthlyPayGradeID  Int?
+  hourlyPayGradeID   Int?
+  departments        Departments? @relation(fields: [departmentNameID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leavePolicy        leavePolicy? @relation(fields: [leavePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  @@index([manageEmployeeID]) 
+  workShift    WorkShift?    @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations Designations? @relation(fields: [designationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  attendancePolicy AttendancePolicy? @relation(fields: [attendancePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  hourlyPayGrade  HourlyPayGrade?  @relation(fields: [hourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  monthlyPayGrade MonthlyPayGrade? @relation(fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee  ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([manageEmployeeID])
 }
 
 model EmpEduQualification {
-  id                Int              @id @default(autoincrement())
-  manageEmployeeID  Int?
-  instituteType     String?          @db.VarChar
-  instituteName     String?          @db.VarChar
-  degree            String?          @db.VarChar
-  pasingYear        String?          @db.VarChar
-  marks             String?          @db.VarChar
-  gpaCgpa           String?          @db.VarChar
-  class             String?          @db.VarChar
+  id               Int     @id @default(autoincrement())
+  manageEmployeeID Int?
+  instituteType    String? @db.VarChar
+  instituteName    String? @db.VarChar
+  degree           String? @db.VarChar
+  pasingYear       String? @db.VarChar
+  marks            String? @db.VarChar
+  gpaCgpa          String? @db.VarChar
+  class            String? @db.VarChar
 
-  manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee ManageEmployee? @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
   @@index([manageEmployeeID])
-
 }
-
 
 model EmpProfExprience {
-  id                Int              @id @default(autoincrement())
-  manageEmployeeID  Int?
-  orgName           String?          @db.VarChar
-  designation       String?          @db.VarChar
-  fromDate          String?          @db.VarChar
-  toDate            String?          @db.VarChar
-  responsibility    String?          @db.VarChar
-  skill             String?          @db.VarChar
+  id               Int     @id @default(autoincrement())
+  manageEmployeeID Int?
+  orgName          String? @db.VarChar
+  designation      String? @db.VarChar
+  fromDate         String? @db.VarChar
+  toDate           String? @db.VarChar
+  responsibility   String? @db.VarChar
+  skill            String? @db.VarChar
 
-  manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee ManageEmployee? @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([manageEmployeeID])
 }
 
-	
 model EmpDeviceMapping {
-  id                Int   @id @default(autoincrement())
-  manageEmployeeID  Int?              // RENAME from `employeeID` → `manageEmployeeID`
-  deviceID          Int
-  deviceEmpCode     String? @db.VarChar
+  id               Int     @id @default(autoincrement())
+  manageEmployeeID Int? // RENAME from `employeeID` → `manageEmployeeID`
+  deviceID         Int
+  deviceEmpCode    String? @db.VarChar
 
- 
-  manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  device            Devices          @relation(fields: [deviceID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee ManageEmployee? @relation(fields: [manageEmployeeID], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  device         Devices         @relation(fields: [deviceID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([manageEmployeeID])
   @@index([deviceID])
- 
 }
-
 
 model ManageHoliday {
   id                Int              @id @default(autoincrement())
@@ -593,8 +586,8 @@ model MonthlyPayGrade {
   monthlyPayGradeDeductionList                                                 MonthlyPayGradeDeductionList[]
   promotionRequest_promotionRequest_currentMonthlyPayGradeIDTomonthlyPayGrade  PromotionRequest[]             @relation("promotionRequest_currentMonthlyPayGradeIDTomonthlyPayGrade")
   promotionRequest_promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade PromotionRequest[]             @relation("promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade")
+  empPromotion                                                                 EmpPromotion[]
 }
-
 
 model MonthlyPayGradeAllowanceList {
   id                Int              @id @default(autoincrement())
@@ -623,8 +616,6 @@ model MonthlyPayGradeDeductionList {
   salaryDeduction   SalaryDeduction? @relation(fields: [salaryDeductionID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
-
-
 
 model PublicHoliday {
   id                 Int                  @id @default(autoincrement())
@@ -734,7 +725,7 @@ model WorkShift {
   branchesID        Int?
   workShiftName     String?          @db.VarChar
   isActive          String?          @db.VarChar
-  manageEmployee    ManageEmployee[]
+  empPromotion      EmpPromotion[]
   branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -751,4 +742,3 @@ model WorkShiftDay {
   totalMinutes Int?
   workShift    WorkShift? @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
-
