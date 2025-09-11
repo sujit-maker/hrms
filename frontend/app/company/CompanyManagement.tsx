@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -15,51 +15,60 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table"
 import { Badge } from "../components/ui/badge"
 import { Icon } from "@iconify/react"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Eye } from "lucide-react"
 
 interface Company {
-  id: string
+  id: number
+  serviceProviderID?: number
+  companyName?: string
+  address?: string
+  country?: string
+  state?: string
+  timeZone?: string
+  currency?: string
+  pfNo?: string
+  tanNo?: string
+  panNo?: string
+  esiNo?: string
+  linNo?: string
+  gstNo?: string
+  shopRegNo?: string
+  financialYearStart?: string
+  contactNo?: string
+  emailAdd?: string
+  companyLogoUrl?: string
+  SignatureUrl?: string
+  createdAt?: string
+}
+
+interface ServiceProvider {
+  id: number
   companyName: string
-  companyAddress: string
-  country: string
-  states: string
-  timeZone: string
-  currency: string
-  pfNo: string
-  tanNo: string
-  panNo: string
-  esiNo: string
-  linNo: string
-  gstNo: string
-  shopRegistrationCertificateNo: string
-  financialYearStart: string
-  contactNumber: string
-  emailAddress: string
-  companyLogo: string
-  signatureUpload: string
-  createdAt: string
 }
 
 export function CompanyManagement() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [editingCompany, setEditingCompany] = useState<Company | null>(null)
-  const [formData, setFormData] = useState({
+  const [viewCompany, setViewCompany] = useState<Company | null>(null)
+  const [serviceProviders, setServiceProviders] = useState<ServiceProvider[]>([])
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [signatureFile, setSignatureFile] = useState<File | null>(null)
+
+  interface CompanyFormData extends Partial<Company> {
+    autocompleteName?: string
+  }
+
+  const [formData, setFormData] = useState<CompanyFormData>({
     companyName: "",
-    companyAddress: "",
+    address: "",
     country: "",
-    states: "",
+    state: "",
     timeZone: "",
     currency: "",
     pfNo: "",
@@ -68,57 +77,144 @@ export function CompanyManagement() {
     esiNo: "",
     linNo: "",
     gstNo: "",
-    shopRegistrationCertificateNo: "",
+    shopRegNo: "",
     financialYearStart: "",
-    contactNumber: "",
-    emailAddress: "",
-    companyLogo: "",
-    signatureUpload: ""
+    contactNo: "",
+    emailAdd: "",
+    autocompleteName: "",
   })
 
-  const filteredCompanies = companies.filter(company =>
-    company.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    company.emailAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    company.country.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (editingCompany) {
-      // Update existing company
-      setCompanies(prev => 
-        prev.map(company => 
-          company.id === editingCompany.id 
-            ? { 
-                ...company, 
-                ...formData,
-                id: editingCompany.id,
-                createdAt: editingCompany.createdAt
-              }
-            : company
-        )
-      )
-    } else {
-      // Add new company
-      const newCompany: Company = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString().split('T')[0]
-      }
-      setCompanies(prev => [...prev, newCompany])
+  // Fetch companies
+  useEffect(() => {
+    fetchCompanies()
+  }, [])
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/company")
+      const data = await res.json()
+      setCompanies(data)
+    } catch (error) {
+      console.error("Error fetching companies:", error)
     }
-    
-    resetForm()
-    setIsDialogOpen(false)
+  }
+
+  // Fetch service providers for autocomplete
+  const fetchServiceProviders = async (query: string) => {
+    try {
+      const res = await fetch("http://localhost:8000/service-provider")
+      const data = await res.json()
+      const filtered = data.filter((sp: ServiceProvider) =>
+        sp.companyName.toLowerCase().includes(query.toLowerCase())
+      )
+      setServiceProviders(filtered)
+    } catch (error) {
+      console.error("Error fetching service providers:", error)
+    }
+  }
+
+  useEffect(() => {
+    if (formData.companyName && formData.companyName.length > 1) {
+      fetchServiceProviders(formData.companyName)
+    }
+  }, [formData.companyName])
+
+ 
+// add once near your helpers/constants
+const UPLOAD_URL = "http://localhost:8000/files/upload";
+
+async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(UPLOAD_URL, { method: "POST", body: fd });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const raw = await res.json();
+  // try common shapes: {url}, {data:{url}}, {location}
+  return raw?.url || raw?.data?.url || raw?.location || "";
+}
+
+  // Submit form
+// Submit form
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    // 1) upload files first (if provided)
+    let companyLogoUrl = formData.companyLogoUrl || "";
+    let SignatureUrl = formData.SignatureUrl || "";
+
+    if (logoFile) {
+      companyLogoUrl = await uploadImage(logoFile);
+    }
+    if (signatureFile) {
+      SignatureUrl = await uploadImage(signatureFile);
+    }
+
+    // 2) choose companyName: manual first, autocomplete fallback
+    const finalData = {
+      ...formData,
+      companyName: formData.companyName || formData.autocompleteName || "",
+      companyLogoUrl: companyLogoUrl || undefined,
+      SignatureUrl: SignatureUrl || undefined,
+    };
+
+    // 3) send JSON payload to your API
+    const res = editingCompany
+      ? await fetch(`http://localhost:8000/company/${editingCompany.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(finalData),
+        })
+      : await fetch("http://localhost:8000/company", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(finalData),
+        });
+
+    if (!res.ok) throw new Error(await res.text());
+
+    await fetchCompanies();
+    resetForm();
+    setIsDialogOpen(false);
+  } catch (err) {
+    console.error(err);
+    // optionally surface to UI:
+    // setError(err instanceof Error ? err.message : "Save failed");
+  }
+};
+
+
+
+  const handleEdit = (company: Company) => {
+    setFormData(company)
+    setEditingCompany(company)
+    setIsDialogOpen(true)
+  }
+
+  const handleView = (company: Company) => {
+    setViewCompany(company)
+    setIsViewDialogOpen(true)
+  }
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Are you sure you want to delete this company?")) {
+      try {
+        await fetch(`http://localhost:8000/company/${id}`, { method: "DELETE" })
+        await fetchCompanies()
+      } catch (error) {
+        console.error("Error deleting company:", error)
+      }
+    }
   }
 
   const resetForm = () => {
     setFormData({
       companyName: "",
-      companyAddress: "",
+      address: "",
       country: "",
-      states: "",
+      state: "",
       timeZone: "",
       currency: "",
       pfNo: "",
@@ -127,293 +223,177 @@ export function CompanyManagement() {
       esiNo: "",
       linNo: "",
       gstNo: "",
-      shopRegistrationCertificateNo: "",
+      shopRegNo: "",
       financialYearStart: "",
-      contactNumber: "",
-      emailAddress: "",
-      companyLogo: "",
-      signatureUpload: ""
+      contactNo: "",
+      emailAdd: "",
     })
+    setLogoFile(null)
+    setSignatureFile(null)
     setEditingCompany(null)
   }
 
-  const handleEdit = (company: Company) => {
-    setFormData({
-      companyName: company.companyName,
-      companyAddress: company.companyAddress,
-      country: company.country,
-      states: company.states,
-      timeZone: company.timeZone,
-      currency: company.currency,
-      pfNo: company.pfNo,
-      tanNo: company.tanNo,
-      panNo: company.panNo,
-      esiNo: company.esiNo,
-      linNo: company.linNo,
-      gstNo: company.gstNo,
-      shopRegistrationCertificateNo: company.shopRegistrationCertificateNo,
-      financialYearStart: company.financialYearStart,
-      contactNumber: company.contactNumber,
-      emailAddress: company.emailAddress,
-      companyLogo: company.companyLogo,
-      signatureUpload: company.signatureUpload
-    })
-    setEditingCompany(company)
-    setIsDialogOpen(true)
-  }
+  const filteredCompanies = companies.filter(
+    (c) =>
+      c.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.country?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.emailAdd?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
-  const handleDelete = (id: string) => {
-    setCompanies(prev => prev.filter(company => company.id !== id))
-  }
+  // Close autocomplete on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setServiceProviders([])
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   return (
-    <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
+    <div className="space-y-6 w-full max-w-7xl mx-auto px-4">
       {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">Company</h1>
-          <p className="text-gray-600 mt-1 text-sm">Manage your company information</p>
+          <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
+          <p className="text-gray-600 mt-1 text-sm">Manage registered companies</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-sm px-3 py-2">
-              <Plus className="w-4 h-4 mr-1" />
-              Add Company
+            <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 text-sm px-3 py-2">
+              <Plus className="w-4 h-4 mr-1" /> Add Company
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                {editingCompany ? "Edit Company" : "Add New Company"}
-              </DialogTitle>
+              <DialogTitle>{editingCompany ? "Edit Company" : "Add New Company"}</DialogTitle>
               <DialogDescription>
-                {editingCompany 
-                  ? "Update the company information below." 
-                  : "Fill in the details to add a new company."
-                }
+                {editingCompany ? "Update company details below." : "Fill in details to add a new company."}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name *</Label>
-                <Input
-                  id="companyName"
-                  value={formData.companyName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                  placeholder="Enter company name"
-                  required
-                />
-              </div>
+              {/* Company Name with Service Provider Autocomplete */}
+             <div ref={wrapperRef} className="space-y-2 relative">
+  <Label>Service Provider *</Label>
+  <Input
+    value={formData.autocompleteName || ""} // separate state for autocomplete input
+    onChange={(e) => {
+      const val = e.target.value
+      setFormData((p) => ({ ...p, autocompleteName: val }))
+      if (val.length > 1) fetchServiceProviders(val)
+      else setServiceProviders([])
+    }}
+    placeholder="Start typing service provider..."
+    autoComplete="off"
+  />
+  {serviceProviders.length > 0 && (
+    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-40 overflow-y-auto">
+      {serviceProviders.map((sp) => (
+        <div
+          key={sp.id}
+          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+          onMouseDown={(e) => e.preventDefault()} // prevent blur
+          onClick={() => {
+            // On single click, set serviceProviderID and autocompleteName
+            setFormData((p) => ({
+              ...p,
+              serviceProviderID: sp.id,
+              autocompleteName: sp.companyName,
+            }))
+            setServiceProviders([])
+          }}
+        >
+          {sp.companyName}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
+<div className="space-y-2">
+  <Label>Company Name (Manual / Override)</Label>
+  <Input
+    value={formData.companyName || ""}
+    onChange={(e) => setFormData((p) => ({ ...p, companyName: e.target.value }))}
+    placeholder="Enter company name manually"
+  />
+</div>
+
+
+              {/* Rest of the form */}
               <div className="space-y-2">
-                <Label htmlFor="companyAddress">Company Address *</Label>
+                <Label>Company Address</Label>
                 <Textarea
-                  id="companyAddress"
-                  value={formData.companyAddress}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyAddress: e.target.value }))}
-                  placeholder="Enter company address"
+                  value={formData.address || ""}
+                  onChange={(e) => setFormData((p) => ({ ...p, address: e.target.value }))}
                   rows={3}
-                  required
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country *</Label>
-                  <Input
-                    id="country"
-                    value={formData.country}
-                    onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                    placeholder="Enter country"
-                    required
-                  />
+                  <Label>Country</Label>
+                  <Input value={formData.country || ""} onChange={(e) => setFormData((p) => ({ ...p, country: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="states">States *</Label>
-                  <Input
-                    id="states"
-                    value={formData.states}
-                    onChange={(e) => setFormData(prev => ({ ...prev, states: e.target.value }))}
-                    placeholder="Enter state/province"
-                    required
-                  />
+                  <Label>State</Label>
+                  <Input value={formData.state || ""} onChange={(e) => setFormData((p) => ({ ...p, state: e.target.value }))} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="timeZone">Time Zone *</Label>
-                  <Input
-                    id="timeZone"
-                    value={formData.timeZone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, timeZone: e.target.value }))}
-                    placeholder="Enter time zone"
-                    required
-                  />
+                  <Label>Time Zone</Label>
+                  <Input value={formData.timeZone || ""} onChange={(e) => setFormData((p) => ({ ...p, timeZone: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency *</Label>
-                  <Input
-                    id="currency"
-                    value={formData.currency}
-                    onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                    placeholder="Enter currency"
-                    required
-                  />
+                  <Label>Currency</Label>
+                  <Input value={formData.currency || ""} onChange={(e) => setFormData((p) => ({ ...p, currency: e.target.value }))} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pfNo">PF No *</Label>
-                  <Input
-                    id="pfNo"
-                    value={formData.pfNo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, pfNo: e.target.value }))}
-                    placeholder="Enter PF number"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tanNo">TAN No *</Label>
-                  <Input
-                    id="tanNo"
-                    value={formData.tanNo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tanNo: e.target.value }))}
-                    placeholder="Enter TAN number"
-                    required
-                  />
-                </div>
+                <div className="space-y-2"><Label>PF No</Label><Input value={formData.pfNo || ""} onChange={(e) => setFormData((p) => ({ ...p, pfNo: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>TAN No</Label><Input value={formData.tanNo || ""} onChange={(e) => setFormData((p) => ({ ...p, tanNo: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>PAN No</Label><Input value={formData.panNo || ""} onChange={(e) => setFormData((p) => ({ ...p, panNo: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>ESI No</Label><Input value={formData.esiNo || ""} onChange={(e) => setFormData((p) => ({ ...p, esiNo: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>LIN No</Label><Input value={formData.linNo || ""} onChange={(e) => setFormData((p) => ({ ...p, linNo: e.target.value }))} /></div>
+                <div className="space-y-2"><Label>GST No</Label><Input value={formData.gstNo || ""} onChange={(e) => setFormData((p) => ({ ...p, gstNo: e.target.value }))} /></div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Shop Registration Certificate No</Label>
+                <Input value={formData.shopRegNo || ""} onChange={(e) => setFormData((p) => ({ ...p, shopRegNo: e.target.value }))} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Financial Year Start</Label>
+                <Input value={formData.financialYearStart || ""} onChange={(e) => setFormData((p) => ({ ...p, financialYearStart: e.target.value }))} />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="panNo">PAN No *</Label>
-                  <Input
-                    id="panNo"
-                    value={formData.panNo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, panNo: e.target.value }))}
-                    placeholder="Enter PAN number"
-                    required
-                  />
+                  <Label>Contact Number</Label>
+                  <Input value={formData.contactNo || ""} onChange={(e) => setFormData((p) => ({ ...p, contactNo: e.target.value }))} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="esiNo">ESI No *</Label>
-                  <Input
-                    id="esiNo"
-                    value={formData.esiNo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, esiNo: e.target.value }))}
-                    placeholder="Enter ESI number"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="linNo">LIN No *</Label>
-                  <Input
-                    id="linNo"
-                    value={formData.linNo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, linNo: e.target.value }))}
-                    placeholder="Enter LIN number"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gstNo">GST No *</Label>
-                  <Input
-                    id="gstNo"
-                    value={formData.gstNo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, gstNo: e.target.value }))}
-                    placeholder="Enter GST number"
-                    required
-                  />
+                  <Label>Email Address</Label>
+                  <Input type="email" value={formData.emailAdd || ""} onChange={(e) => setFormData((p) => ({ ...p, emailAdd: e.target.value }))} />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="shopRegistrationCertificateNo">Shop Registration Certificate No *</Label>
-                <Input
-                  id="shopRegistrationCertificateNo"
-                  value={formData.shopRegistrationCertificateNo}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shopRegistrationCertificateNo: e.target.value }))}
-                  placeholder="Enter shop registration certificate number"
-                  required
-                />
+                <Label>Company Logo</Label>
+                <Input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="financialYearStart">Financial Year Start *</Label>
-                <Input
-                  id="financialYearStart"
-                  value={formData.financialYearStart}
-                  onChange={(e) => setFormData(prev => ({ ...prev, financialYearStart: e.target.value }))}
-                  placeholder="Enter financial year start"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contactNumber">Contact Number *</Label>
-                  <Input
-                    id="contactNumber"
-                    value={formData.contactNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, contactNumber: e.target.value }))}
-                    placeholder="Enter contact number"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="emailAddress">Email Address *</Label>
-                  <Input
-                    id="emailAddress"
-                    type="email"
-                    value={formData.emailAddress}
-                    onChange={(e) => setFormData(prev => ({ ...prev, emailAddress: e.target.value }))}
-                    placeholder="Enter email address"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="companyLogo">Company Logo</Label>
-                <Input
-                  id="companyLogo"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      setFormData(prev => ({ ...prev, companyLogo: file.name }))
-                    }
-                  }}
-                />
-                <p className="text-sm text-gray-500">Upload company logo (PNG, JPG, JPEG)</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signatureUpload">Signature Upload</Label>
-                <Input
-                  id="signatureUpload"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      setFormData(prev => ({ ...prev, signatureUpload: file.name }))
-                    }
-                  }}
-                />
-                <p className="text-sm text-gray-500">Upload signature (PNG, JPG, JPEG)</p>
+                <Label>Signature Upload</Label>
+                <Input type="file" accept="image/*" onChange={(e) => setSignatureFile(e.target.files?.[0] || null)} />
               </div>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                 <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
                   {editingCompany ? "Update Company" : "Add Company"}
                 </Button>
@@ -423,112 +403,121 @@ export function CompanyManagement() {
         </Dialog>
       </div>
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-4 w-full">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search companies..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full"
-              />
+      {/* View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Company Details</DialogTitle>
+            <DialogDescription>All information is read-only.</DialogDescription>
+          </DialogHeader>
+          {viewCompany && (
+            <div className="space-y-3">
+              <p><strong>Name:</strong> {viewCompany.companyName}</p>
+              <p><strong>Address:</strong> {viewCompany.address}</p>
+              <p><strong>Country:</strong> {viewCompany.country}</p>
+              <p><strong>State:</strong> {viewCompany.state}</p>
+              <p><strong>GST No:</strong> {viewCompany.gstNo}</p>
+              <p><strong>Contact:</strong> {viewCompany.contactNo}</p>
+              <p><strong>Email:</strong> {viewCompany.emailAdd}</p>
+              <p><strong>Currency:</strong> {viewCompany.currency}</p>
+              <p><strong>TimeZone:</strong> {viewCompany.timeZone}</p>
+              <p><strong>PF:</strong> {viewCompany.pfNo}</p>
+              <p><strong>TAN:</strong> {viewCompany.tanNo}</p>
+              <p><strong>PAN:</strong> {viewCompany.panNo}</p>
+              <p><strong>ESI:</strong> {viewCompany.esiNo}</p>
+              <p><strong>LIN:</strong> {viewCompany.linNo}</p>
+              <p><strong>Shop Reg:</strong> {viewCompany.shopRegNo}</p>
+              <p><strong>FY Start:</strong> {viewCompany.financialYearStart}</p>
+              {viewCompany.companyLogoUrl && <img src={viewCompany.companyLogoUrl} alt="Company Logo" className="w-24 h-24 object-contain" />}
+              {viewCompany.SignatureUrl && <img src={viewCompany.SignatureUrl} alt="Signature" className="w-24 h-24 object-contain" />}
             </div>
-            <Badge variant="secondary" className="px-3 py-1 flex-shrink-0">
-              {filteredCompanies.length} companies
-            </Badge>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setIsViewDialogOpen(false)} variant="outline">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Search & Table */}
+      <Card>
+        <CardContent className="p-6 flex items-center space-x-4">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search companies..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full"
+            />
           </div>
+          <Badge variant="secondary" className="px-3 py-1 flex-shrink-0">
+            {filteredCompanies.length} companies
+          </Badge>
         </CardContent>
       </Card>
 
-      {/* Company Table */}
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icon icon="mdi:office-building" className="w-5 h-5" />
-            Company List
+            <Icon icon="mdi:office-building" className="w-5 h-5" /> Company List
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0 w-full">
-          <div className="overflow-x-auto w-full">
-            <Table className="w-full">
-              <TableHeader>
+        <CardContent className="p-0 w-full overflow-x-auto">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Country</TableHead>
+                <TableHead>State</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>GST</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCompanies.length === 0 ? (
                 <TableRow>
-                  <TableHead className="w-[120px]">Company Name</TableHead>
-                  <TableHead className="w-[150px]">Address</TableHead>
-                  <TableHead className="w-[100px]">Country</TableHead>
-                  <TableHead className="w-[100px]">States</TableHead>
-                  <TableHead className="w-[100px]">Time Zone</TableHead>
-                  <TableHead className="w-[80px]">Currency</TableHead>
-                  <TableHead className="w-[100px]">PF No</TableHead>
-                  <TableHead className="w-[100px]">TAN No</TableHead>
-                  <TableHead className="w-[100px]">PAN No</TableHead>
-                  <TableHead className="w-[100px]">ESI No</TableHead>
-                  <TableHead className="w-[100px]">LIN No</TableHead>
-                  <TableHead className="w-[100px]">GST No</TableHead>
-                  <TableHead className="w-[100px]">Contact</TableHead>
-                  <TableHead className="w-[140px]">Email</TableHead>
-                  <TableHead className="w-[100px]">Created</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <Icon icon="mdi:account-search" className="w-12 h-12 text-gray-300" />
+                      <p>No companies found</p>
+                      <p className="text-sm">Try adjusting your search criteria</p>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCompanies.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={16} className="text-center py-8 text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <Icon icon="mdi:office-building-outline" className="w-12 h-12 text-gray-300" />
-                        <p>No companies found</p>
-                        <p className="text-sm">Try adjusting your search criteria</p>
+              ) : (
+                filteredCompanies.map((company) => (
+                  <TableRow key={company.id}>
+                    <TableCell>{company.companyName}</TableCell>
+                    <TableCell>{company.country}</TableCell>
+                    <TableCell>{company.state}</TableCell>
+                    <TableCell>{company.emailAdd}</TableCell>
+                    <TableCell>{company.contactNo}</TableCell>
+                    <TableCell>{company.gstNo}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleView(company)} className="h-7 w-7 p-0">
+                          <Eye className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(company)} className="h-7 w-7 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(company.id)}
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredCompanies.map((company) => (
-                    <TableRow key={company.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{company.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.companyAddress}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.country}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.states}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.timeZone}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.currency}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.pfNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.tanNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.panNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.esiNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.linNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.gstNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.contactNumber}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.emailAddress}</TableCell>
-                      <TableCell className="whitespace-nowrap">{company.createdAt}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(company)}
-                            className="h-7 w-7 p-0"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(company.id)}
-                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

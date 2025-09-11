@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { BankDetailsService } from './bank-details.service';
 import { CreateBankDetailsDto } from './dto/create-bank-detail.dto';
 import { UpdateBankDetailsDto } from './dto/update-bank-detail.dto';
@@ -32,10 +23,7 @@ export class BankDetailsController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateBankDetailsDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBankDetailsDto) {
     return this.bankDetailsService.update(id, dto);
   }
 

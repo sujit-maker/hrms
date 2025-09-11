@@ -11,9 +11,14 @@ export class ContractorsService {
     return this.prisma.contractors.create({ data });
   }
 
-  findAll() {
-    return this.prisma.contractors.findMany();
-  }
+  // contractors.service.ts
+findAll() {
+  return this.prisma.contractors.findMany({
+    orderBy: { id: 'desc' },
+    include: { serviceProvider: true, company: true, branches: true }, // <-- add this
+  });
+}
+
 
   findOne(id: number) {
     return this.prisma.contractors.findUnique({ where: { id } });

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -28,14 +28,14 @@ import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2, Eye } from "lucide-react"
 
 interface ServiceProvider {
-  id: string
+  id: number
   companyName: string
   companyAddress: string
   country: string
-  states: string
+  state: string
   gstNo: string
-  contactNumber: string
-  emailAddress: string
+  contactNo: string
+  emailAdd: string
   website: string
   companyLogo: string
   createdAt: string
@@ -45,69 +45,85 @@ export function ServiceProviderManagement() {
   const [serviceProviders, setServiceProviders] = useState<ServiceProvider[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [editingProvider, setEditingProvider] = useState<ServiceProvider | null>(null)
+  const [viewProvider, setViewProvider] = useState<ServiceProvider | null>(null)
   const [formData, setFormData] = useState({
     companyName: "",
     companyAddress: "",
     country: "",
-    states: "",
+    state: "",
     gstNo: "",
-    contactNumber: "",
-    emailAddress: "",
+    contactNo: "",
+    emailAdd: "",
     website: "",
-    companyLogo: ""
+    companyLogo: "",
   })
 
-  const filteredProviders = serviceProviders.filter(provider =>
-    provider.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    provider.emailAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    provider.country.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // 🔹 Fetch providers on load
+  useEffect(() => {
+    fetchProviders()
+  }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (editingProvider) {
-      // Update existing provider
-      setServiceProviders(prev => 
-        prev.map(provider => 
-          provider.id === editingProvider.id 
-            ? { 
-                ...provider, 
-                ...formData,
-                id: editingProvider.id,
-                createdAt: editingProvider.createdAt
-              }
-            : provider
-        )
-      )
-    } else {
-      // Add new provider
-      const newProvider: ServiceProvider = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString().split('T')[0]
-      }
-      setServiceProviders(prev => [...prev, newProvider])
+  const fetchProviders = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/service-provider")
+      const data = await res.json()
+      setServiceProviders(data)
+    } catch (error) {
+      console.error("Error fetching service providers:", error)
     }
-    
-    resetForm()
-    setIsDialogOpen(false)
   }
 
-  const resetForm = () => {
-    setFormData({
-      companyName: "",
-      companyAddress: "",
-      country: "",
-      states: "",
-      gstNo: "",
-      contactNumber: "",
-      emailAddress: "",
-      website: "",
-      companyLogo: ""
-    })
-    setEditingProvider(null)
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
+
+  try {
+    console.log("Submitting form data:", formData)
+
+    let res
+  if (editingProvider) {
+  res = await fetch(`http://localhost:8000/service-provider/${editingProvider.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(formData),
+  })
+} else {
+  res = await fetch("http://localhost:8000/service-provider", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(formData),
+  })
+}
+
+
+    console.log("Response status:", res.status)
+
+    if (!res.ok) {
+      const errText = await res.text()
+      throw new Error(`Request failed: ${res.status} - ${errText}`)
+    }
+
+    await fetchProviders()
+    resetForm()
+    setIsDialogOpen(false)
+  } catch (error) {
+    console.error("Error saving service provider:", error)
+  }
+}
+
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Are you sure you want to delete this service provider?")) {
+      try {
+        await fetch(`http://localhost:8000/service-provider/${id}`, {
+          method: "DELETE",
+        })
+        await fetchProviders()
+      } catch (error) {
+        console.error("Error deleting service provider:", error)
+      }
+    }
   }
 
   const handleEdit = (provider: ServiceProvider) => {
@@ -115,20 +131,43 @@ export function ServiceProviderManagement() {
       companyName: provider.companyName,
       companyAddress: provider.companyAddress,
       country: provider.country,
-      states: provider.states,
+      state: provider.state,
       gstNo: provider.gstNo,
-      contactNumber: provider.contactNumber,
-      emailAddress: provider.emailAddress,
+      contactNo: provider.contactNo,
+      emailAdd: provider.emailAdd,
       website: provider.website,
-      companyLogo: provider.companyLogo
+      companyLogo: provider.companyLogo,
     })
     setEditingProvider(provider)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setServiceProviders(prev => prev.filter(provider => provider.id !== id))
+  const handleView = (provider: ServiceProvider) => {
+    setViewProvider(provider)
+    setIsViewDialogOpen(true)
   }
+
+  const resetForm = () => {
+    setFormData({
+      companyName: "",
+      companyAddress: "",
+      country: "",
+      state: "",
+      gstNo: "",
+      contactNo: "",
+      emailAdd: "",
+      website: "",
+      companyLogo: "",
+    })
+    setEditingProvider(null)
+  }
+
+  const filteredProviders = serviceProviders.filter(
+    (provider) =>
+      provider.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      provider.emailAdd.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      provider.country.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
@@ -140,7 +179,10 @@ export function ServiceProviderManagement() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-sm px-3 py-2">
+            <Button
+              onClick={resetForm}
+              className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-sm px-3 py-2"
+            >
               <Plus className="w-4 h-4 mr-1" />
               Add Service Provider
             </Button>
@@ -151,10 +193,9 @@ export function ServiceProviderManagement() {
                 {editingProvider ? "Edit Service Provider" : "Add New Service Provider"}
               </DialogTitle>
               <DialogDescription>
-                {editingProvider 
-                  ? "Update the service provider information below." 
-                  : "Fill in the details to add a new service provider."
-                }
+                {editingProvider
+                  ? "Update the service provider information below."
+                  : "Fill in the details to add a new service provider."}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -163,108 +204,78 @@ export function ServiceProviderManagement() {
                 <Input
                   id="companyName"
                   value={formData.companyName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                  placeholder="Enter company name"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, companyName: e.target.value }))}
                   required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="companyAddress">Company Address *</Label>
                 <Textarea
                   id="companyAddress"
                   value={formData.companyAddress}
-                  onChange={(e) => setFormData(prev => ({ ...prev, companyAddress: e.target.value }))}
-                  placeholder="Enter company address"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, companyAddress: e.target.value }))}
                   rows={3}
                   required
                 />
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="country">Country *</Label>
                   <Input
                     id="country"
                     value={formData.country}
-                    onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                    placeholder="Enter country"
+                    onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="states">States *</Label>
+                  <Label htmlFor="state">state *</Label>
                   <Input
-                    id="states"
-                    value={formData.states}
-                    onChange={(e) => setFormData(prev => ({ ...prev, states: e.target.value }))}
-                    placeholder="Enter state/province"
+                    id="state"
+                    value={formData.state}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
                     required
                   />
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="gstNo">GST No *</Label>
                 <Input
                   id="gstNo"
                   value={formData.gstNo}
-                  onChange={(e) => setFormData(prev => ({ ...prev, gstNo: e.target.value }))}
-                  placeholder="Enter GST number"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, gstNo: e.target.value }))}
                   required
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="contactNumber">Contact Number *</Label>
+                  <Label htmlFor="contactNo">Contact Number *</Label>
                   <Input
-                    id="contactNumber"
-                    value={formData.contactNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, contactNumber: e.target.value }))}
-                    placeholder="Enter contact number"
+                    id="contactNo"
+                    value={formData.contactNo}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, contactNo: e.target.value }))}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="emailAddress">Email Address *</Label>
+                  <Label htmlFor="emailAdd">Email Address *</Label>
                   <Input
-                    id="emailAddress"
+                    id="emailAdd"
                     type="email"
-                    value={formData.emailAddress}
-                    onChange={(e) => setFormData(prev => ({ ...prev, emailAddress: e.target.value }))}
-                    placeholder="Enter email address"
+                    value={formData.emailAdd}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, emailAdd: e.target.value }))}
                     required
                   />
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="website">Website</Label>
                 <Input
                   id="website"
                   value={formData.website}
-                  onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
-                  placeholder="Enter website URL"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, website: e.target.value }))}
                 />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="companyLogo">Company Logo</Label>
-                <Input
-                  id="companyLogo"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      setFormData(prev => ({ ...prev, companyLogo: file.name }))
-                    }
-                  }}
-                />
-                <p className="text-sm text-gray-500">Upload company logo (PNG, JPG, JPEG)</p>
-              </div>
-
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
@@ -278,7 +289,31 @@ export function ServiceProviderManagement() {
         </Dialog>
       </div>
 
-      {/* Search and Filters */}
+      {/* View Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Service Provider Details</DialogTitle>
+            <DialogDescription>All information is read-only.</DialogDescription>
+          </DialogHeader>
+          {viewProvider && (
+            <div className="space-y-3">
+              <p><strong>Company:</strong> {viewProvider.companyName}</p>
+              <p><strong>Address:</strong> {viewProvider.companyAddress}</p>
+              <p><strong>Country:</strong> {viewProvider.country}</p>
+              <p><strong>State:</strong> {viewProvider.state}</p>
+              <p><strong>GST No:</strong> {viewProvider.gstNo}</p>
+              <p><strong>Contact:</strong> {viewProvider.contactNo}</p>
+              <p><strong>Email:</strong> {viewProvider.emailAdd}</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setIsViewDialogOpen(false)} variant="outline">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Search */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center space-x-4 w-full">
@@ -298,7 +333,7 @@ export function ServiceProviderManagement() {
         </CardContent>
       </Card>
 
-      {/* Service Providers Table */}
+      {/* Table */}
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -311,16 +346,14 @@ export function ServiceProviderManagement() {
             <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">Company Name</TableHead>
-                  <TableHead className="w-[150px]">Address</TableHead>
-                  <TableHead className="w-[100px]">Country</TableHead>
-                  <TableHead className="w-[100px]">States</TableHead>
-                  <TableHead className="w-[100px]">GST No</TableHead>
-                  <TableHead className="w-[110px]">Contact</TableHead>
-                  <TableHead className="w-[140px]">Email</TableHead>
-                  <TableHead className="w-[80px]">Website</TableHead>
-                  <TableHead className="w-[100px]">Created</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  <TableHead>Company Name</TableHead>
+                  <TableHead>Address</TableHead>
+                  <TableHead>Country</TableHead>
+                  <TableHead>state</TableHead>
+                  <TableHead>GST No</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -337,30 +370,23 @@ export function ServiceProviderManagement() {
                 ) : (
                   filteredProviders.map((provider) => (
                     <TableRow key={provider.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{provider.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.companyAddress}</TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.country}</TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.states}</TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.gstNo}</TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.contactNumber}</TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.emailAddress}</TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {provider.website ? (
-                          <a 
-                            href={provider.website} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 underline text-sm"
-                          >
-                            Visit
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{provider.createdAt}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell>{provider.companyName}</TableCell>
+                      <TableCell>{provider.companyAddress}</TableCell>
+                      <TableCell>{provider.country}</TableCell>
+                      <TableCell>{provider.state}</TableCell>
+                      <TableCell>{provider.gstNo}</TableCell>
+                      <TableCell>{provider.contactNo}</TableCell>
+                      <TableCell>{provider.emailAdd}</TableCell>
+                      <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleView(provider)}
+                            className="h-7 w-7 p-0"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

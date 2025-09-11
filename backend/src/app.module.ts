@@ -16,6 +16,11 @@ import { ManageHolidayModule } from './manage-holiday/manage-holiday.module';
 import { PublicHolidayModule } from './public-holiday/public-holiday.module';
 import { LeavePolicyModule } from './leave-policy/leave-policy.module';
 import { LeaveApplicationRequestModule } from './leave-application-request/leave-application-request.module';
+import { FilesModule } from './files/files.module';
+import { DevicesModule } from './devices/devices.module';
+import { ManageEmployeeModule } from './manage-employee/manage-employee.module';
+import { EmpCurrentPositionModule } from './emp-current-position/emp-current-position.module';
+import { PromotionRequestModule } from './promotion-request/promotion-request.module';
 
 @Module({
   imports: [
@@ -38,6 +43,11 @@ import { LeaveApplicationRequestModule } from './leave-application-request/leave
     PublicHolidayModule,
     LeavePolicyModule,
     LeaveApplicationRequestModule,
+    FilesModule,
+    DevicesModule,
+    ManageEmployeeModule,
+    EmpCurrentPositionModule,
+    PromotionRequestModule,
   ],
 })
 export class AppModule {}

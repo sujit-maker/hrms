@@ -1,16 +1,9 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  ParseIntPipe,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { BranchesService } from './branches.service';
 import { CreateBranchesDto } from './dto/create-branch.dto';
 import { UpdateBranchesDto } from './dto/update-branch.dto';
+
+
 
 @Controller('branches')
 export class BranchesController {
@@ -32,10 +25,7 @@ export class BranchesController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateBranchesDto,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBranchesDto) {
     return this.branchesService.update(id, dto);
   }
 
