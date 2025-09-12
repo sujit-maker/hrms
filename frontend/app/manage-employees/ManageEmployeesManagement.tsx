@@ -1,4 +1,12 @@
 "use client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
+
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -36,6 +44,9 @@ interface SP { id: ID; companyName?: string | null; }
 interface CO { id: ID; companyName?: string | null; }
 interface BR { id: ID; branchName?: string | null; }
 interface Device { id: ID; deviceName?: string | null; }
+interface MonthlyPG { id: ID; monthlyPayGradeName?: string | null; }
+interface HourlyPG { id: ID; hourlyPayGradeName?: string | null; }
+
 
 type PromotionForm = {
   id?: number;
@@ -163,6 +174,9 @@ const API = {
   attendancePolicies: "http://localhost:8000/attendance-policy",
   leavePolicies: "http://localhost:8000/leave-policy",
   devices: "http://localhost:8000/devices",
+  monthlyGrades: "http://localhost:8000/monthly-grade",
+  hourlyGrades: "http://localhost:8000/hourly-grade",
+
 };
 
 const MIN_CHARS = 1;
@@ -170,10 +184,14 @@ const DEBOUNCE_MS = 250;
 
 async function fetchJSONSafe<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    // include the URL so you can see exactly which endpoint failed
+    throw new Error(`${res.status} ${res.statusText} @ ${url}`);
+  }
   const raw = await res.json();
   return (raw?.data ?? raw) as T;
 }
+
 
 async function fetchFirstById<T extends { id: number }>(url: string, id?: number | null) {
   if (!id) return null;
@@ -185,35 +203,47 @@ async function fetchFirstById<T extends { id: number }>(url: string, id?: number
   }
 }
 
-async function resolveLabelsForEdit(r: ManageEmpRead, setFormData: React.Dispatch<React.SetStateAction<any>>) {
-  const [
-    dept,
-    desg,
-    mgr,
-    ws,
-    ap,
-    lp,
-    devicesList,
-    contractor            // <-- add this
-  ] = await Promise.all([
+async function resolveLabelsForEdit(
+  r: ManageEmpRead,
+  setFormData: React.Dispatch<React.SetStateAction<any>>
+) {
+  // run all lookups but don't crash if any fails
+  const results = await Promise.allSettled([
     fetchFirstById<{ id: ID; departmentName?: string | null }>(API.departments, r.departmentNameID),
     fetchFirstById<{ id: ID; designantion?: string | null }>(API.designations, r.designationID),
     fetchFirstById<{ id: ID; employeeFirstName?: string | null; employeeLastName?: string | null }>(API.employees, r.managerID),
     fetchFirstById<{ id: ID; workShiftName?: string | null }>(API.workShifts, r.workShiftID),
     fetchFirstById<{ id: ID; attendancePolicyName?: string | null }>(API.attendancePolicies, r.attendancePolicyID),
     fetchFirstById<{ id: ID; leavePolicyName?: string | null }>(API.leavePolicies, r.leavePolicyID),
-    fetchJSONSafe<any[]>(API.devices), // whatever you already do here
-    fetchFirstById<{ id: ID; contractorName?: string | null }>(API.contractors, r.contractorID) // <-- new
+    // devices list can 404 if route mismatch; treat as empty list
+    fetchJSONSafe<any[]>(API.devices),
+    fetchFirstById<{ id: ID; contractorName?: string | null }>(API.contractors, r.contractorID),
   ]);
+
+  const get = <T,>(i: number, fallback: T | null = null): T | null =>
+    results[i].status === "fulfilled" ? (results[i] as PromiseFulfilledResult<any>).value as T : fallback;
+
+  const dept = get<{ departmentName?: string | null }>(0);
+  const desg = get<{ designantion?: string | null }>(1);
+  const mgr = get<{ employeeFirstName?: string | null; employeeLastName?: string | null }>(2);
+  const ws = get<{ workShiftName?: string | null }>(3);
+  const ap = get<{ attendancePolicyName?: string | null }>(4);
+  const lp = get<{ leavePolicyName?: string | null }>(5);
+  const devicesList = get<any[]>(6, []) || [];
+  const contractor = get<{ contractorName?: string | null }>(7);
 
   const mgrFull = mgr ? `${mgr.employeeFirstName ?? ""} ${mgr.employeeLastName ?? ""}`.trim() : "";
 
-  // backfill device names in devMapForm if missing
   setFormData((prev: any) => {
     const devMapForm = (prev.devMapForm || []).map((d: any) => {
-      if (d.deviceName) return d; // already had it from API
-      const match = (devicesList || []).find((dv) => dv.id === Number(d.deviceID));
-      return { ...d, deviceName: match?.deviceName ?? "", _devAutocomplete: match?.deviceName ?? "", deviceEmpCode: d.deviceEmpCode ?? "" };
+      if (d.deviceName) return d;
+      const match = devicesList.find((dv) => dv.id === Number(d.deviceID));
+      return {
+        ...d,
+        deviceName: match?.deviceName ?? "",
+        _devAutocomplete: match?.deviceName ?? "",
+        deviceEmpCode: d.deviceEmpCode ?? "",
+      };
     });
 
     return {
@@ -229,6 +259,7 @@ async function resolveLabelsForEdit(r: ManageEmpRead, setFormData: React.Dispatc
     };
   });
 }
+
 
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -255,20 +286,32 @@ export function ManageEmployeesManagement() {
   const coRef = useRef<HTMLDivElement>(null);
   const brRef = useRef<HTMLDivElement>(null);
 
+  const monthlyPGRef = useRef<HTMLDivElement>(null);
+  const hourlyPGRef = useRef<HTMLDivElement>(null);
+
   const [spList, setSpList] = useState<SP[]>([]);
   const [coList, setCoList] = useState<CO[]>([]);
   const [brList, setBrList] = useState<BR[]>([]);
+  const [monthlyPGList, setMonthlyPGList] = useState<MonthlyPG[]>([]);
+  const [hourlyPGList, setHourlyPGList] = useState<HourlyPG[]>([]);
+
   const [spLoading, setSpLoading] = useState(false);
   const [coLoading, setCoLoading] = useState(false);
   const [brLoading, setBrLoading] = useState(false);
+  const [monthlyPGLoading, setMonthlyPGLoading] = useState(false);
+  const [hourlyPGLoading, setHourlyPGLoading] = useState(false);
 
   const spAbortRef = useRef<AbortController | null>(null);
   const coAbortRef = useRef<AbortController | null>(null);
   const brAbortRef = useRef<AbortController | null>(null);
+  const monthlyPGAbortRef = useRef<AbortController | null>(null);
+  const hourlyPGAbortRef = useRef<AbortController | null>(null);
 
   const spTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const brTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const monthlyPGTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hourlyPGTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Photo upload
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -337,6 +380,9 @@ export function ManageEmployeesManagement() {
     designationID: null as ID | null,
     managerID: null as ID | null,
     joiningDate: "",
+
+    monthlyPGAutocomplete: "",
+    hourlyPGAutocomplete: "",
 
     employmentType: "",
     employmentStatus: "",
@@ -433,6 +479,41 @@ export function ManageEmployeesManagement() {
       } finally { setSpLoading(false); }
     }, DEBOUNCE_MS);
   };
+
+  const runFetchMonthlyPG = (q: string) => {
+    if (monthlyPGTimerRef.current) clearTimeout(monthlyPGTimerRef.current);
+    monthlyPGTimerRef.current = setTimeout(async () => {
+      if (q.length < MIN_CHARS) { setMonthlyPGList([]); return; }
+      monthlyPGAbortRef.current?.abort();
+      const ctrl = new AbortController(); monthlyPGAbortRef.current = ctrl;
+      setMonthlyPGLoading(true);
+      try {
+        const all = await fetchJSONSafe<MonthlyPG[]>(API.monthlyGrades, ctrl.signal);
+        const filtered = (all || []).filter(x =>
+          (x.monthlyPayGradeName ?? "").toLowerCase().includes(q.toLowerCase())
+        );
+        setMonthlyPGList(filtered.slice(0, 20));
+      } finally { setMonthlyPGLoading(false); }
+    }, DEBOUNCE_MS);
+  };
+
+  const runFetchHourlyPG = (q: string) => {
+    if (hourlyPGTimerRef.current) clearTimeout(hourlyPGTimerRef.current);
+    hourlyPGTimerRef.current = setTimeout(async () => {
+      if (q.length < MIN_CHARS) { setHourlyPGList([]); return; }
+      hourlyPGAbortRef.current?.abort();
+      const ctrl = new AbortController(); hourlyPGAbortRef.current = ctrl;
+      setHourlyPGLoading(true);
+      try {
+        const all = await fetchJSONSafe<HourlyPG[]>(API.hourlyGrades, ctrl.signal);
+        const filtered = (all || []).filter(x =>
+          (x.hourlyPayGradeName ?? "").toLowerCase().includes(q.toLowerCase())
+        );
+        setHourlyPGList(filtered.slice(0, 20));
+      } finally { setHourlyPGLoading(false); }
+    }, DEBOUNCE_MS);
+  };
+
 
   const runFetchDept = (q: string) => {
     if (deptTimerRef.current) clearTimeout(deptTimerRef.current);
@@ -618,6 +699,7 @@ export function ManageEmployeesManagement() {
 
 
 
+
   // refs for outside-click close
   const deptRef = useRef<HTMLDivElement>(null);
   const desgRef = useRef<HTMLDivElement>(null);
@@ -678,6 +760,8 @@ export function ManageEmployeesManagement() {
       if (apRef.current && !apRef.current.contains(e.target as any)) setApList([]);
       if (lpRef.current && !lpRef.current.contains(e.target as any)) setLpList([]);
       if (devRef.current && !devRef.current.contains(e.target as any)) setDevList([]);
+      if (monthlyPGRef.current && !monthlyPGRef.current.contains(e.target as any)) setMonthlyPGList([]);
+      if (hourlyPGRef.current && !hourlyPGRef.current.contains(e.target as any)) setHourlyPGList([]);
 
 
     };
@@ -796,6 +880,9 @@ export function ManageEmployeesManagement() {
       managerID: null,
       joiningDate: "",
 
+      monthlyPGAutocomplete: "",
+      hourlyPGAutocomplete: "",
+
       employmentType: "",
       employmentStatus: "",
       contractorID: null,
@@ -885,6 +972,7 @@ export function ManageEmployeesManagement() {
     try {
       const uploadedPhotoUrl = await uploadPhotoIfNeeded();
 
+
       // Map nested arrays to API contracts
       const edu = formData.eduForm.map(e => ({
         id: e.id,
@@ -917,6 +1005,9 @@ export function ManageEmployeesManagement() {
       const eduRemaining = new Set(edu.filter(e => e.id != null).map(e => e.id as number));
       const expRemaining = new Set(exp.filter(x => x.id != null).map(x => x.id as number));
       const devRemaining = new Set(devices.filter(d => d.id != null).map(d => d.id as number));
+
+      const type = formData.promotion?.salaryPayGradeType;
+
 
       const payload: any = {
         serviceProviderID: formData.serviceProviderID ?? undefined,
@@ -964,8 +1055,10 @@ export function ManageEmployeesManagement() {
           attendancePolicyID: formData.promotion?.attendancePolicyID ?? undefined,
           leavePolicyID: formData.promotion?.leavePolicyID ?? undefined,
           salaryPayGradeType: formData.promotion?.salaryPayGradeType || undefined,
-          monthlyPayGradeID: formData.promotion?.monthlyPayGradeID ?? undefined,
-          hourlyPayGradeID: formData.promotion?.hourlyPayGradeID ?? undefined,
+          monthlyPayGradeID:
+            type === "Monthly" ? formData.promotion?.monthlyPayGradeID ?? undefined : undefined,
+          hourlyPayGradeID:
+            type === "Hourly" ? formData.promotion?.hourlyPayGradeID ?? undefined : undefined,
         },
 
         // Deletions when editing (names expected by UpdateManageEmployeeDto)
@@ -1042,10 +1135,19 @@ export function ManageEmployeesManagement() {
         ? [...(r as any).empPromotion].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0))[0]
         : null;
 
+    // ✅ use promotion IDs when present
+    const effectiveDeptID = latestPromotion?.departmentNameID ?? r.departmentNameID ?? null;
+    const effectiveDesgID = latestPromotion?.designationID ?? r.designationID ?? null;
+    const effectiveMgrID = latestPromotion?.managerID ?? r.managerID ?? null;
+
+
     setFormData({
       serviceProviderID: r.serviceProviderID ?? r.serviceProvider?.id ?? null,
       companyID: r.companyID ?? r.company?.id ?? null,
       branchesID: r.branchesID ?? r.branches?.id ?? null,
+      departmentNameID: effectiveDeptID,
+      designationID: effectiveDesgID,
+      managerID: effectiveMgrID,
 
       spAutocomplete: r.serviceProvider?.companyName ?? r.serviceProviderName ?? "",
       coAutocomplete: r.company?.companyName ?? r.companyName ?? "",
@@ -1055,10 +1157,11 @@ export function ManageEmployeesManagement() {
       employeeLastName: r.employeeLastName ?? "",
       deviceEmpCode: r.deviceEmpCode ?? "",
       employeeID: r.employeeID ?? "",
-      departmentNameID: r.departmentNameID ?? null,
-      designationID: r.designationID ?? null,
-      managerID: r.managerID ?? null,
+
       joiningDate: r.joiningDate ?? "",
+
+      monthlyPGAutocomplete: "",
+      hourlyPGAutocomplete: "",
 
       employmentType: r.employmentType ?? "",
       employmentStatus: r.employmentStatus ?? "",
@@ -1086,13 +1189,11 @@ export function ManageEmployeesManagement() {
       employeeMotherName: r.employeeMotherName ?? "",
       employeeSpouseName: r.employeeSpouseName ?? "",
 
-      deptAutocomplete: r.departmentNameID ? String(r.departmentNameID) : "", // or pre-fill with fetched name if your GET :id includes dept
-      desgAutocomplete: r.designationID ? String(r.designationID) : "",
+
       contrAutocomplete:
         r.contractor?.contractorName ??
         r.contractorName ??
         (r.contractorID ? String(r.contractorID) : ""),
-      mgrAutocomplete: r.managerID ? String(r.managerID) : "",
       wsAutocomplete: r.workShiftID ? String(r.workShiftID) : "",
       apAutocomplete: r.attendancePolicyID ? String(r.attendancePolicyID) : "",
       lpAutocomplete: r.leavePolicyID ? String(r.leavePolicyID) : "",
@@ -1115,6 +1216,7 @@ export function ManageEmployeesManagement() {
         id: undefined,
         departmentNameID: null,
         designationID: null,
+
         managerID: null,
         employmentType: "",
         employmentStatus: "",
@@ -1127,15 +1229,44 @@ export function ManageEmployeesManagement() {
         hourlyPayGradeID: null,
       },
 
-
+      deptAutocomplete: "",
+      desgAutocomplete: "",
+      mgrAutocomplete: "",
 
       eduForm,
       expForm,
       devMapForm,
     });
 
-    resolveLabelsForEdit(r, setFormData);
+    (async () => {
+      const mpId = latestPromotion?.monthlyPayGradeID ?? null;
+      const hpId = latestPromotion?.hourlyPayGradeID ?? null;
 
+      if (mpId) {
+        const m = await fetchFirstById<MonthlyPG>(API.monthlyGrades, mpId);
+        setFormData((p) => ({
+          ...p,
+          monthlyPGAutocomplete: m?.monthlyPayGradeName ?? String(mpId),
+        }));
+      }
+      if (hpId) {
+        const h = await fetchFirstById<HourlyPG>(API.hourlyGrades, hpId);
+        setFormData((p) => ({
+          ...p,
+          hourlyPGAutocomplete: h?.hourlyPayGradeName ?? String(hpId),
+        }));
+      }
+    })();
+
+    resolveLabelsForEdit(
+      {
+        ...r,
+        departmentNameID: effectiveDeptID,
+        designationID: effectiveDesgID,
+        managerID: effectiveMgrID,
+      } as any,
+      setFormData
+    );
     setOriginalEduIds(eduForm.filter(x => x.id != null).map(x => x.id!));
     setOriginalExpIds(expForm.filter(x => x.id != null).map(x => x.id!));
     setOriginalDevMapIds(devMapForm.filter(x => x.id != null).map(x => x.id!));
@@ -1204,7 +1335,10 @@ export function ManageEmployeesManagement() {
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-y-auto"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+
             <DialogHeader>
               <DialogTitle>{editingRow ? "Edit Employee" : "Add New Employee"}</DialogTitle>
               <DialogDescription>
@@ -1381,200 +1515,205 @@ export function ManageEmployeesManagement() {
                     onChange={(e) => setFormData((p) => ({ ...p, joiningDate: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Salary Pay Grade Type</Label>
-                  <Input
-                    value={formData.promotion.salaryPayGradeType}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormData((p) => ({
-                        ...p,
-                        salaryPayGradeType: val,                         // optional: keep for backward-compat
-                        promotion: { ...p.promotion, salaryPayGradeType: val },
-                      }));
-                    }}
-                    placeholder="Monthly / Hourly / …"
-                  />
-                </div>
+
 
               </div>
 
               {/* IDs & employment */}
-              <div ref={deptRef} className="space-y-2 relative">
-                <Label>Department</Label>
-                <Input
-                  value={formData.deptAutocomplete}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFormData((p) => ({
-                      ...p,
-                      deptAutocomplete: val,
-                      departmentNameID: null,                          // clear root
-                      promotion: { ...p.promotion, departmentNameID: null }, // clear promotion side too
-                    }));
-                    runFetchDept(val);
-                  }}
-                  onFocus={(e) => {
-                    const val = e.target.value;
-                    if (val.length >= MIN_CHARS) runFetchDept(val);
-                  }}
-                  placeholder="Start typing department…"
-                  autoComplete="off"
-                />
-                {deptList.length > 0 && (
-                  <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                    {deptLoading && (
-                      <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
-                    )}
-                    {deptList.map((d) => (
-                      <div
-                        key={d.id}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          setFormData((p) => ({
-                            ...p,
-                            departmentNameID: d.id,
-                            deptAutocomplete: d.departmentName ?? String(d.id),
-                            promotion: { ...p.promotion, departmentNameID: d.id },
-                          }));
-                          setDeptList([]);
-                        }}
-                      >
-                        {d.departmentName}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <div className="grid grid-cols-3 gap-4">
 
-
-
-              {/* Designation */}
-              <div ref={desgRef} className="space-y-2 relative">
-                <Label>Designation</Label>
-                <Input
-                  value={formData.desgAutocomplete}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFormData((p) => ({
-                      ...p,
-                      desgAutocomplete: val,
-                      designationID: null,
-                      promotion: { ...p.promotion, designationID: null },
-                    }));
-                    runFetchDesg(val);
-                  }}
-                  onFocus={(e) => {
-                    const val = e.target.value;
-                    if (val.length >= MIN_CHARS) runFetchDesg(val);
-                  }}
-                  placeholder="Start typing designation…"
-                  autoComplete="off"
-                />
-                {desgList.length > 0 && (
-                  <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                    {desgLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
-                    {desgList.map((d) => (
-                      <div
-                        key={d.id}
-                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          setFormData((p) => ({
-                            ...p,
-                            designationID: d.id,
-                            desgAutocomplete: d.designantion ?? String(d.id),
-                            promotion: { ...p.promotion, designationID: d.id },
-                          }));
-                          setDesgList([]);
-                        }}
-                      >
-                        {d.designantion}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-
-              <div ref={mgrRef} className="space-y-2 relative">
-                <Label>Manager</Label>
-                <Input
-                  value={formData.mgrAutocomplete}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setFormData((p) => ({
-                      ...p,
-                      mgrAutocomplete: val,
-                      managerID: null,
-                      promotion: { ...p.promotion, managerID: null },
-                    }));
-                    runFetchMgr(val);
-                  }}
-                  onFocus={(e) => {
-                    const val = e.target.value;
-                    if (val.length >= MIN_CHARS) runFetchMgr(val);
-                  }}
-                  placeholder="Start typing manager…"
-                  autoComplete="off"
-                />
-                {mgrList.length > 0 && (
-                  <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                    {mgrLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
-                    {mgrList.map((m) => {
-                      const full = `${m.employeeFirstName ?? ""} ${m.employeeLastName ?? ""}`.trim() || `#${m.id}`;
-                      return (
+                <div ref={deptRef} className="space-y-2 relative">
+                  <Label>Department</Label>
+                  <Input
+                    value={formData.deptAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        deptAutocomplete: val,
+                        departmentNameID: null,                          // clear root
+                        promotion: { ...p.promotion, departmentNameID: null }, // clear promotion side too
+                      }));
+                      runFetchDept(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchDept(val);
+                    }}
+                    placeholder="Start typing department…"
+                    autoComplete="off"
+                  />
+                  {deptList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {deptLoading && (
+                        <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
+                      )}
+                      {deptList.map((d) => (
                         <div
-                          key={m.id}
+                          key={d.id}
                           className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => {
                             setFormData((p) => ({
                               ...p,
-                              managerID: m.id,
-                              mgrAutocomplete: full,
-                              promotion: { ...p.promotion, managerID: m.id },
+                              departmentNameID: d.id,
+                              deptAutocomplete: d.departmentName ?? String(d.id),
+                              promotion: { ...p.promotion, departmentNameID: d.id },
                             }));
-                            setMgrList([]);
+                            setDeptList([]);
                           }}
                         >
-                          {full}
+                          {d.departmentName}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+
+
+                {/* Designation */}
+                <div ref={desgRef} className="space-y-2 relative">
+                  <Label>Designation</Label>
+                  <Input
+                    value={formData.desgAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        desgAutocomplete: val,
+                        designationID: null,
+                        promotion: { ...p.promotion, designationID: null },
+                      }));
+                      runFetchDesg(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchDesg(val);
+                    }}
+                    placeholder="Start typing designation…"
+                    autoComplete="off"
+                  />
+                  {desgList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {desgLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {desgList.map((d) => (
+                        <div
+                          key={d.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((p) => ({
+                              ...p,
+                              designationID: d.id,
+                              desgAutocomplete: d.designantion ?? String(d.id),
+                              promotion: { ...p.promotion, designationID: d.id },
+                            }));
+                            setDesgList([]);
+                          }}
+                        >
+                          {d.designantion}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+
+                <div ref={mgrRef} className="space-y-2 relative">
+                  <Label>Manager</Label>
+                  <Input
+                    value={formData.mgrAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        mgrAutocomplete: val,
+                        managerID: null,
+                        promotion: { ...p.promotion, managerID: null },
+                      }));
+                      runFetchMgr(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchMgr(val);
+                    }}
+                    placeholder="Start typing manager…"
+                    autoComplete="off"
+                  />
+                  {mgrList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {mgrLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {mgrList.map((m) => {
+                        const full = `${m.employeeFirstName ?? ""} ${m.employeeLastName ?? ""}`.trim() || `#${m.id}`;
+                        return (
+                          <div
+                            key={m.id}
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setFormData((p) => ({
+                                ...p,
+                                managerID: m.id,
+                                mgrAutocomplete: full,
+                                promotion: { ...p.promotion, managerID: m.id },
+                              }));
+                              setMgrList([]);
+                            }}
+                          >
+                            {full}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Employment Type</Label>
-                  <Input
-                    value={formData.promotion.employmentType}
-                    onChange={(e) =>
+                  <Select
+                    value={formData.promotion.employmentType || ""}
+                    onValueChange={(val) =>
                       setFormData((p) => ({
                         ...p,
-                        promotion: { ...p.promotion, employmentType: e.target.value },
+                        promotion: { ...p.promotion, employmentType: val },
                       }))
                     }
-                  />
-
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select employment type…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Company">Company</SelectItem>
+                      <SelectItem value="Contract">Contract</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Employment Status</Label>
-                  <Input
-                    value={formData.promotion.employmentStatus}
-                    onChange={(e) =>
+                  <Select
+                    value={formData.promotion.employmentStatus || ""}
+                    onValueChange={(val) =>
                       setFormData((p) => ({
                         ...p,
-                        promotion: { ...p.promotion, employmentStatus: e.target.value },
+                        promotion: { ...p.promotion, employmentStatus: val },
                       }))
                     }
-                  />
-
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select employment status…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Permanent">Permanent</SelectItem>
+                      <SelectItem value="Probation">Probation</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 {/* Contractor  */}
                 <div ref={contrRef} className="space-y-2 relative">
                   <Label>Contractor</Label>
@@ -1620,51 +1759,138 @@ export function ManageEmployeesManagement() {
 
               {/* Policy / Shift IDs */}
               <div className="grid grid-cols-3 gap-4">
-                <div ref={wsRef} className="space-y-2 relative">
-                  <Label>Work Shift</Label>
-                  <Input
-                    value={formData.wsAutocomplete}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormData((p) => ({
-                        ...p,
-                        wsAutocomplete: val,
-                        workShiftID: null,
-                        promotion: { ...p.promotion, workShiftID: null },
-                      }));
-                      runFetchWS(val);
-                    }}
-                    onFocus={(e) => {
-                      const val = e.target.value;
-                      if (val.length >= MIN_CHARS) runFetchWS(val);
-                    }}
-                    placeholder="Start typing work shift…"
-                    autoComplete="off"
-                  />
-                  {wsList.length > 0 && (
-                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                      {wsLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
-                      {wsList.map((w) => (
-                        <div
-                          key={w.id}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setFormData((p) => ({
-                              ...p,
-                              workShiftID: w.id,
-                              wsAutocomplete: w.workShiftName ?? String(w.id),
-                              promotion: { ...p.promotion, workShiftID: w.id },
-                            }));
-                            setWsList([]);
-                          }}
-                        >
-                          {w.workShiftName}
+                {/* Salary Pay Grade Type + conditional autocompletes */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Salary Pay Grade Type</Label>
+                    <Select
+                      value={formData.promotion.salaryPayGradeType || ""}
+                      onValueChange={(val) =>
+                        setFormData((p) => ({
+                          ...p,
+                          salaryPayGradeType: val, // optional: keep for backward-compat
+                          promotion: {
+                            ...p.promotion,
+                            salaryPayGradeType: val,
+                            // clear the opposite side to avoid stale IDs
+                            monthlyPayGradeID: val === "Monthly" ? p.promotion.monthlyPayGradeID : null,
+                            hourlyPayGradeID: val === "Hourly" ? p.promotion.hourlyPayGradeID : null,
+                          },
+                          // also clear the opposite autocomplete text
+                          monthlyPGAutocomplete: val === "Monthly" ? p.monthlyPGAutocomplete : "",
+                          hourlyPGAutocomplete: val === "Hourly" ? p.hourlyPGAutocomplete : "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select type…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Monthly">Monthly</SelectItem>
+                        <SelectItem value="Hourly">Hourly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Monthly PG (only when Monthly is selected) */}
+                  {formData.promotion.salaryPayGradeType === "Monthly" && (
+                    <div ref={monthlyPGRef} className="space-y-2 relative">
+                      <Label>Monthly Pay Grade</Label>
+                      <Input
+                        value={formData.monthlyPGAutocomplete}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((p) => ({
+                            ...p,
+                            monthlyPGAutocomplete: val,
+                            promotion: { ...p.promotion, monthlyPayGradeID: null }, // clear id while typing
+                          }));
+                          runFetchMonthlyPG(val);
+                        }}
+                        onFocus={(e) => {
+                          const val = e.target.value;
+                          if (val.length >= MIN_CHARS) runFetchMonthlyPG(val);
+                        }}
+                        placeholder="Start typing monthly grade…"
+                        autoComplete="off"
+                      />
+                      {monthlyPGList.length > 0 && (
+                        <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                          {monthlyPGLoading && (
+                            <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
+                          )}
+                          {monthlyPGList.map((g) => (
+                            <div
+                              key={g.id}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setFormData((p) => ({
+                                  ...p,
+                                  monthlyPGAutocomplete: g.monthlyPayGradeName ?? String(g.id),
+                                  promotion: { ...p.promotion, monthlyPayGradeID: g.id },
+                                }));
+                                setMonthlyPGList([]);
+                              }}
+                            >
+                              {g.monthlyPayGradeName}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+                    </div>
+                  )}
+
+                  {/* Hourly PG (only when Hourly is selected) */}
+                  {formData.promotion.salaryPayGradeType === "Hourly" && (
+                    <div ref={hourlyPGRef} className="space-y-2 relative">
+                      <Label>Hourly Pay Grade</Label>
+                      <Input
+                        value={formData.hourlyPGAutocomplete}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData((p) => ({
+                            ...p,
+                            hourlyPGAutocomplete: val,
+                            promotion: { ...p.promotion, hourlyPayGradeID: null }, // clear id while typing
+                          }));
+                          runFetchHourlyPG(val);
+                        }}
+                        onFocus={(e) => {
+                          const val = e.target.value;
+                          if (val.length >= MIN_CHARS) runFetchHourlyPG(val);
+                        }}
+                        placeholder="Start typing hourly grade…"
+                        autoComplete="off"
+                      />
+                      {hourlyPGList.length > 0 && (
+                        <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                          {hourlyPGLoading && (
+                            <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
+                          )}
+                          {hourlyPGList.map((g) => (
+                            <div
+                              key={g.id}
+                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                setFormData((p) => ({
+                                  ...p,
+                                  hourlyPGAutocomplete: g.hourlyPayGradeName ?? String(g.id),
+                                  promotion: { ...p.promotion, hourlyPayGradeID: g.id },
+                                }));
+                                setHourlyPGList([]);
+                              }}
+                            >
+                              {g.hourlyPayGradeName}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
+
 
                 {/* Attendance Policy */}
                 <div ref={apRef} className="space-y-2 relative">
@@ -1846,12 +2072,26 @@ export function ManageEmployeesManagement() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Gender</Label>
-                  <Input
-                    value={formData.gender}
-                    onChange={(e) => setFormData((p) => ({ ...p, gender: e.target.value }))}
-                    placeholder="Male / Female / …"
-                  />
+                  <Select
+                    value={formData.gender || ""}
+                    onValueChange={(val) =>
+                      setFormData((p) => ({
+                        ...p,
+                        gender: val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select gender…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Transgender">Transgender</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Date of Birth</Label>
                   <Input
@@ -1872,11 +2112,25 @@ export function ManageEmployeesManagement() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Marital Status</Label>
-                  <Input
-                    value={formData.maritalStatus}
-                    onChange={(e) => setFormData((p) => ({ ...p, maritalStatus: e.target.value }))}
-                  />
+                  <Select
+                    value={formData.maritalStatus || ""}
+                    onValueChange={(val) =>
+                      setFormData((p) => ({
+                        ...p,
+                        maritalStatus: val,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select marital status…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Single">Single</SelectItem>
+                      <SelectItem value="Married">Married</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Father's Name</Label>
                   <Input

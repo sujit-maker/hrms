@@ -20,6 +20,7 @@ import { DevicesModule } from './devices/devices.module';
 import { ManageEmployeeModule } from './manage-employee/manage-employee.module';
 import { EmpCurrentPositionModule } from './emp-current-position/emp-current-position.module';
 import { PromotionRequestModule } from './promotion-request/promotion-request.module';
+import { EmpPromotionModule } from './emp-promotion/emp-promotion.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PromotionRequestModule } from './promotion-request/promotion-request.mo
     ManageEmployeeModule,
     EmpCurrentPositionModule,
     PromotionRequestModule,
+    EmpPromotionModule,
   ],
 })
 export class AppModule {}

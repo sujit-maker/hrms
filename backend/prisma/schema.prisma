@@ -302,6 +302,7 @@ model PromotionRequest {
   newSalaryCtc                                                                Int?
   newEmploymentType                                                           Int?
   newEmployementStatus                                                        String?          @db.VarChar
+
   proposedDepartmentID                                                        Int?
   proposedDesignationID                                                       Int?
   proposedMonthlyPayGradeID                                                   Int?
