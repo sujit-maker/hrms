@@ -92,14 +92,12 @@ export function CompanyManagement() {
   }, [])
 
   const fetchCompanies = async () => {
-    try {
-      const res = await fetch("http://localhost:8000/company")
-      const data = await res.json()
-      setCompanies(data)
-    } catch (error) {
-      console.error("Error fetching companies:", error)
-    }
-  }
+  const res = await fetch("http://localhost:8000/company");
+  const json = await res.json();
+  const list = Array.isArray(json) ? json : (json.data ?? []);
+  setCompanies(list);
+};
+
 
   // Fetch service providers for autocomplete
   const fetchServiceProviders = async (query: string) => {

@@ -31,6 +31,7 @@ import { MonthlyPayGradeModule } from './monthly-pay-grade/monthly-pay-grade.mod
 import { HourlyGradeModule } from './hourly-grade/hourly-grade.module';
 import { BonusSetupModule } from './bonus-setup/bonus-setup.module';
 import { BonousAllocationModule } from './bonous-allocation/bonous-allocation.module';
+import { WorkShiftModule } from './work-shift/work-shift.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { BonousAllocationModule } from './bonous-allocation/bonous-allocation.mo
     HourlyGradeModule,
     BonusSetupModule,
     BonousAllocationModule,
+    WorkShiftModule,
   ],
 })
 export class AppModule {}

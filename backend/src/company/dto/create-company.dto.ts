@@ -39,6 +39,10 @@ export class CreateCompanyDto {
 
   @IsOptional()
   @IsString()
+  panNo?: string;
+
+  @IsOptional()
+  @IsString()
   esiNo?: string;
 
   @IsOptional()
