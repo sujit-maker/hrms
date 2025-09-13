@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -25,12 +25,17 @@ import {
 import { Badge } from "../components/ui/badge"
 import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { SearchSuggestInput } from "../components/SearchSuggestInput"
 
 interface PublicHoliday {
   id: string
-  serviceProvider: string
-  companyName: string
-  branchName: string
+  serviceProviderID?: number
+  companyID?: number
+  branchesID?: number
+  manageHolidayID?: number
+  serviceProvider?: string
+  companyName?: string
+  branchName?: string
   holidayName: string
   financialYear: string
   startDate: string
@@ -38,59 +43,39 @@ interface PublicHoliday {
   createdAt: string
 }
 
-// Mock data for dropdowns
-const mockServiceProviders = [
-  "TechCorp Solutions",
-  "Global Services Ltd",
-  "Enterprise Systems",
-  "Digital Innovations"
-]
+interface SelectedItem {
+  display: string
+  value: number
+  item: any
+}
 
-const mockCompanies = [
-  "ABC Corporation",
-  "XYZ Industries",
-  "Tech Solutions Inc",
-  "Global Enterprises"
-]
+// Backend URL
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
-const mockBranches = [
-  "Mumbai Branch",
-  "Delhi Branch",
-  "Bangalore Branch",
-  "Chennai Branch"
-]
+// Generate financial years (Jan to Dec and Apr to Mar)
+const generateFinancialYears = () => {
+  const years = []
+  const currentYear = new Date().getFullYear()
+  
+  // Generate years from 2020 to 2030
+  for (let year = 2020; year <= 2030; year++) {
+    // Jan to Dec format
+    years.push(`${year}`)
+    // Apr to Mar format (next year)
+    years.push(`${year}-${(year + 1).toString().slice(-2)}`)
+  }
+  
+  return years
+}
 
-// Mock data for holidays from Manage Holiday
-const mockHolidays = [
-  "New Year's Day",
-  "Republic Day",
-  "Independence Day",
-  "Gandhi Jayanti",
-  "Diwali",
-  "Holi",
-  "Eid",
-  "Christmas",
-  "Good Friday",
-  "Dussehra",
-  "Navratri",
-  "Raksha Bandhan"
-]
-
-// Mock data for financial years
-const mockFinancialYears = [
-  "2023",
-  "2024",
-  "2025",
-  "2023-24",
-  "2024-25",
-  "2025-26"
-]
+const financialYears = generateFinancialYears()
 
 export function PublicHolidayManagement() {
   const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState<PublicHoliday | null>(null)
+  const [holidayOptions, setHolidayOptions] = useState<any[]>([])
   const [formData, setFormData] = useState({
     serviceProvider: "",
     companyName: "",
@@ -98,39 +83,169 @@ export function PublicHolidayManagement() {
     holidayName: "",
     financialYear: "",
     startDate: "",
-    endDate: ""
+    endDate: "",
+    serviceProviderID: undefined as number | undefined,
+    companyID: undefined as number | undefined,
+    branchesID: undefined as number | undefined,
+    manageHolidayID: undefined as number | undefined,
   })
 
+  // API functions for search and suggest
+  const fetchServiceProviders = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/service-provider`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.companyName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching service providers:", error)
+      return []
+    }
+  }
+
+  const fetchCompanies = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/company`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.companyName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching companies:", error)
+      return []
+    }
+  }
+
+  const fetchBranches = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/branches`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.branchName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching branches:", error)
+      return []
+    }
+  }
+
+  const fetchManageHolidays = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/manage-holiday`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      return Array.isArray(data) ? data : []
+    } catch (error) {
+      console.error("Error fetching manage holidays:", error)
+      return []
+    }
+  }
+
+  // Load public holidays and holiday options on component mount
+  useEffect(() => {
+    loadPublicHolidays()
+    loadHolidayOptions()
+  }, [])
+
+  const loadHolidayOptions = async () => {
+    try {
+      const holidays = await fetchManageHolidays()
+      setHolidayOptions(holidays)
+    } catch (error) {
+      console.error("Error loading holiday options:", error)
+    }
+  }
+
+  const loadPublicHolidays = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/public-holiday`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      const publicHolidaysData = (Array.isArray(data) ? data : []).map(
+        (holiday: any) => ({
+          id: holiday.id.toString(),
+          serviceProviderID: holiday.serviceProviderID,
+          companyID: holiday.companyID,
+          branchesID: holiday.branchesID,
+          manageHolidayID: holiday.manageHolidayID,
+          serviceProvider: holiday.serviceProvider?.companyName || "",
+          companyName: holiday.company?.companyName || "",
+          branchName: holiday.branches?.branchName || "",
+          holidayName: holiday.manageHoliday?.holidayName || "",
+          financialYear: holiday.financialYear,
+          startDate: holiday.startDate
+            ? new Date(holiday.startDate).toISOString().split("T")[0]
+            : "",
+          endDate: holiday.endDate
+            ? new Date(holiday.endDate).toISOString().split("T")[0]
+            : "",
+          createdAt: holiday.createdAt
+            ? new Date(holiday.createdAt).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+        })
+      )
+      setPublicHolidays(publicHolidaysData)
+    } catch (error) {
+      console.error("Error loading public holidays:", error)
+    }
+  }
+
   const filteredHolidays = publicHolidays.filter(holiday =>
-    holiday.serviceProvider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    holiday.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    holiday.branchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (holiday.serviceProvider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (holiday.companyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (holiday.branchName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     holiday.holidayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     holiday.financialYear.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (editingHoliday) {
-      setPublicHolidays(prev => 
-        prev.map(holiday => 
-          holiday.id === editingHoliday.id 
-            ? { ...holiday, ...formData, id: editingHoliday.id, createdAt: editingHoliday.createdAt }
-            : holiday
-        )
-      )
-    } else {
-      const newHoliday: PublicHoliday = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString().split('T')[0]
+    try {
+      const publicHolidayData = {
+        serviceProviderID: formData.serviceProviderID,
+        companyID: formData.companyID,
+        branchesID: formData.branchesID,
+        manageHolidayID: formData.manageHolidayID,
+        financialYear: formData.financialYear,
+        startDate: formData.startDate ? new Date(formData.startDate) : null,
+        endDate: formData.endDate ? new Date(formData.endDate) : null,
       }
-      setPublicHolidays(prev => [...prev, newHoliday])
-    }
-    
+
+      const url = editingHoliday
+        ? `${BACKEND_URL}/public-holiday/${editingHoliday.id}`
+        : `${BACKEND_URL}/public-holiday`
+      const method = editingHoliday ? "PATCH" : "POST"
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(publicHolidayData),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to save public holiday: ${res.status}`)
+      }
+
+      await loadPublicHolidays()
     resetForm()
     setIsDialogOpen(false)
+    } catch (error) {
+      console.error("Error saving public holiday:", error)
+    }
   }
 
   const resetForm = () => {
@@ -141,28 +256,71 @@ export function PublicHolidayManagement() {
       holidayName: "",
       financialYear: "",
       startDate: "",
-      endDate: ""
+      endDate: "",
+      serviceProviderID: undefined,
+      companyID: undefined,
+      branchesID: undefined,
+      manageHolidayID: undefined,
     })
     setEditingHoliday(null)
   }
 
   const handleEdit = (holiday: PublicHoliday) => {
     setFormData({
-      serviceProvider: holiday.serviceProvider,
-      companyName: holiday.companyName,
-      branchName: holiday.branchName,
+      serviceProvider: holiday.serviceProvider || "",
+      companyName: holiday.companyName || "",
+      branchName: holiday.branchName || "",
       holidayName: holiday.holidayName,
       financialYear: holiday.financialYear,
       startDate: holiday.startDate,
-      endDate: holiday.endDate
+      endDate: holiday.endDate,
+      serviceProviderID: holiday.serviceProviderID,
+      companyID: holiday.companyID,
+      branchesID: holiday.branchesID,
+      manageHolidayID: holiday.manageHolidayID,
     })
     setEditingHoliday(holiday)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setPublicHolidays(prev => prev.filter(holiday => holiday.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/public-holiday/${id}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to delete public holiday: ${res.status}`)
+      }
+      await loadPublicHolidays()
+    } catch (error) {
+      console.error("Error deleting public holiday:", error)
+    }
   }
+
+  const handleServiceProviderSelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      serviceProvider: selected.display,
+      serviceProviderID: selected.value,
+    }))
+  }
+
+  const handleCompanySelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      companyName: selected.display,
+      companyID: selected.value,
+    }))
+  }
+
+  const handleBranchSelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      branchName: selected.display,
+      branchesID: selected.value,
+    }))
+  }
+
 
   return (
     <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
@@ -197,51 +355,45 @@ export function PublicHolidayManagement() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Organization Selection</h3>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="serviceProvider">Service Provider *</Label>
-                      <select
-                        id="serviceProvider"
+                    <SearchSuggestInput
+                      label="Service Provider"
+                      placeholder="Select Service Provider"
                         value={formData.serviceProvider}
-                        onChange={(e) => setFormData(prev => ({ ...prev, serviceProvider: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, serviceProvider: value }))
+                      }
+                      onSelect={handleServiceProviderSelect}
+                      fetchData={fetchServiceProviders}
+                      displayField="companyName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Service Provider</option>
-                        {mockServiceProviders.map((provider) => (
-                          <option key={provider} value={provider}>{provider}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyName">Company Name *</Label>
-                      <select
-                        id="companyName"
+                    />
+                    <SearchSuggestInput
+                      label="Company Name"
+                      placeholder="Select Company"
                         value={formData.companyName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, companyName: value }))
+                      }
+                      onSelect={handleCompanySelect}
+                      fetchData={fetchCompanies}
+                      displayField="companyName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Company</option>
-                        {mockCompanies.map((company) => (
-                          <option key={company} value={company}>{company}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="branchName">Branch Name *</Label>
-                      <select
-                        id="branchName"
+                    />
+                    <SearchSuggestInput
+                      label="Branch Name"
+                      placeholder="Select Branch"
                         value={formData.branchName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, branchName: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, branchName: value }))
+                      }
+                      onSelect={handleBranchSelect}
+                      fetchData={fetchBranches}
+                      displayField="branchName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Branch</option>
-                        {mockBranches.map((branch) => (
-                          <option key={branch} value={branch}>{branch}</option>
-                        ))}
-                      </select>
-                    </div>
+                    />
                   </div>
                 </div>
 
@@ -254,13 +406,20 @@ export function PublicHolidayManagement() {
                       <select
                         id="holidayName"
                         value={formData.holidayName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, holidayName: e.target.value }))}
+                        onChange={(e) => {
+                          const selectedHoliday = holidayOptions.find(h => h.holidayName === e.target.value)
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            holidayName: e.target.value,
+                            manageHolidayID: selectedHoliday?.id
+                          }))
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
                       >
                         <option value="">Select Holiday</option>
-                        {mockHolidays.map((holiday) => (
-                          <option key={holiday} value={holiday}>{holiday}</option>
+                        {holidayOptions.map((holiday) => (
+                          <option key={holiday.id} value={holiday.holidayName}>{holiday.holidayName}</option>
                         ))}
                       </select>
                       <p className="text-xs text-gray-500">Select from Manage Holiday</p>
@@ -275,7 +434,7 @@ export function PublicHolidayManagement() {
                         required
                       >
                         <option value="">Select Financial Year</option>
-                        {mockFinancialYears.map((year) => (
+                        {financialYears.map((year) => (
                           <option key={year} value={year}>{year}</option>
                         ))}
                       </select>

@@ -12,15 +12,19 @@ import { BankDetailsModule } from './bank-details/bank-details.module';
 import { ContractorsModule } from './contractors/contractors.module';
 import { WorkShiftModule } from './work-shift/work-shift.module';
 import { AttendancePolicyModule } from './attendance-policy/attendance-policy.module';
+import { LeavePolicyModule } from './leave-policy/leave-policy.module';
 import { ManageHolidayModule } from './manage-holiday/manage-holiday.module';
 import { PublicHolidayModule } from './public-holiday/public-holiday.module';
 import { LeaveApplicationRequestModule } from './leave-application-request/leave-application-request.module';
+import { LeaveApplicationModule } from './leave-application/leave-application.module';
 import { FilesModule } from './files/files.module';
 import { DevicesModule } from './devices/devices.module';
 import { ManageEmployeeModule } from './manage-employee/manage-employee.module';
 import { EmpCurrentPositionModule } from './emp-current-position/emp-current-position.module';
 import { PromotionRequestModule } from './promotion-request/promotion-request.module';
 import { EmpPromotionModule } from './emp-promotion/emp-promotion.module';
+import { EmpFieldSiteAttendanceModule } from './emp-field-site-attendance/emp-field-site-attendance.module';
+import { EmpAttendanceRegulariseModule } from './emp-attendance-regularise/emp-attendance-regularise.module';
 
 @Module({
   imports: [
@@ -39,15 +43,19 @@ import { EmpPromotionModule } from './emp-promotion/emp-promotion.module';
     ContractorsModule,
     WorkShiftModule,
     AttendancePolicyModule,
+    LeavePolicyModule,
     ManageHolidayModule,
     PublicHolidayModule,
     LeaveApplicationRequestModule,
+    LeaveApplicationModule,
     FilesModule,
     DevicesModule,
     ManageEmployeeModule,
     EmpCurrentPositionModule,
     PromotionRequestModule,
     EmpPromotionModule,
+    EmpFieldSiteAttendanceModule,
+    EmpAttendanceRegulariseModule,
   ],
 })
 export class AppModule {}
