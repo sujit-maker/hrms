@@ -98,6 +98,7 @@ interface ManageEmpRead {
   serviceProviderID?: ID | null;
   companyID?: ID | null;
   branchesID?: ID | null;
+  contractorID?: ID | null;
 
   // Scalars
   employeeFirstName?: string | null;
@@ -111,7 +112,6 @@ interface ManageEmpRead {
 
   employmentType?: string | null;
   employmentStatus?: string | null;
-  contractorID?: ID | null;
   probationPeriod?: string | null;
   workShiftID?: ID | null;
   attendancePolicyID?: ID | null;
@@ -230,7 +230,7 @@ async function resolveLabelsForEdit(
   const ap = get<{ attendancePolicyName?: string | null }>(4);
   const lp = get<{ leavePolicyName?: string | null }>(5);
   const devicesList = get<any[]>(6, []) || [];
-  const contractor = get<{ contractorName?: string | null }>(7);
+  const contractor = get<{ id: ID; contractorName?: string | null }>(7);
 
   const mgrFull = mgr ? `${mgr.employeeFirstName ?? ""} ${mgr.employeeLastName ?? ""}`.trim() : "";
 
@@ -246,9 +246,12 @@ async function resolveLabelsForEdit(
       };
     });
 
+
+
     return {
       ...prev,
       deptAutocomplete: dept?.departmentName ?? prev.deptAutocomplete,
+      contractorID: prev.contractorID ?? (contractor?.id ?? null),
       contrAutocomplete: contractor?.contractorName ?? prev.contrAutocomplete,
       desgAutocomplete: desg?.designantion ?? prev.desgAutocomplete,
       mgrAutocomplete: mgrFull || prev.mgrAutocomplete,
@@ -257,6 +260,8 @@ async function resolveLabelsForEdit(
       lpAutocomplete: lp?.leavePolicyName ?? prev.lpAutocomplete,
       devMapForm,
     };
+
+
   });
 }
 
@@ -367,6 +372,7 @@ export function ManageEmployeesManagement() {
     serviceProviderID: null as ID | null,
     companyID: null as ID | null,
     branchesID: null as ID | null,
+    contractorID: null as ID | null,
     spAutocomplete: "",
     coAutocomplete: "",
     brAutocomplete: "",
@@ -386,7 +392,6 @@ export function ManageEmployeesManagement() {
 
     employmentType: "",
     employmentStatus: "",
-    contractorID: null as ID | null,
     probationPeriod: "",
     workShiftID: null as ID | null,
     attendancePolicyID: null as ID | null,
@@ -497,22 +502,7 @@ export function ManageEmployeesManagement() {
     }, DEBOUNCE_MS);
   };
 
-  const runFetchHourlyPG = (q: string) => {
-    if (hourlyPGTimerRef.current) clearTimeout(hourlyPGTimerRef.current);
-    hourlyPGTimerRef.current = setTimeout(async () => {
-      if (q.length < MIN_CHARS) { setHourlyPGList([]); return; }
-      hourlyPGAbortRef.current?.abort();
-      const ctrl = new AbortController(); hourlyPGAbortRef.current = ctrl;
-      setHourlyPGLoading(true);
-      try {
-        const all = await fetchJSONSafe<HourlyPG[]>(API.hourlyGrades, ctrl.signal);
-        const filtered = (all || []).filter(x =>
-          (x.hourlyPayGradeName ?? "").toLowerCase().includes(q.toLowerCase())
-        );
-        setHourlyPGList(filtered.slice(0, 20));
-      } finally { setHourlyPGLoading(false); }
-    }, DEBOUNCE_MS);
-  };
+
 
 
   const runFetchDept = (q: string) => {
@@ -867,6 +857,8 @@ export function ManageEmployeesManagement() {
       serviceProviderID: null,
       companyID: null,
       branchesID: null,
+      contractorID: null,
+
       spAutocomplete: "",
       coAutocomplete: "",
       brAutocomplete: "",
@@ -878,6 +870,7 @@ export function ManageEmployeesManagement() {
       departmentNameID: null,
       designationID: null,
       managerID: null,
+
       joiningDate: "",
 
       monthlyPGAutocomplete: "",
@@ -885,7 +878,6 @@ export function ManageEmployeesManagement() {
 
       employmentType: "",
       employmentStatus: "",
-      contractorID: null,
       probationPeriod: "",
       workShiftID: null,
       attendancePolicyID: null,
@@ -1013,6 +1005,10 @@ export function ManageEmployeesManagement() {
         serviceProviderID: formData.serviceProviderID ?? undefined,
         companyID: formData.companyID ?? undefined,
         branchesID: formData.branchesID ?? undefined,
+        contractorID:
+          formData.promotion?.employmentType === "Contract"
+            ? (formData.contractorID ?? undefined)
+            : null,
 
         // Scalars that belong to ManageEmployee (keep only those that still live on ManageEmployee)
         employeeFirstName: formData.employeeFirstName || undefined,
@@ -1069,6 +1065,7 @@ export function ManageEmployeesManagement() {
         } : {}),
       };
 
+console.log("SUBMIT PAYLOAD", payload);
 
       if (editingRow) {
         const res = await fetch(`${API.manageEmp}/${editingRow.id}`, {
@@ -1148,6 +1145,8 @@ export function ManageEmployeesManagement() {
       departmentNameID: effectiveDeptID,
       designationID: effectiveDesgID,
       managerID: effectiveMgrID,
+      contractorID: r.contractorID ?? r.contractor?.id ?? null,
+
 
       spAutocomplete: r.serviceProvider?.companyName ?? r.serviceProviderName ?? "",
       coAutocomplete: r.company?.companyName ?? r.companyName ?? "",
@@ -1165,7 +1164,6 @@ export function ManageEmployeesManagement() {
 
       employmentType: r.employmentType ?? "",
       employmentStatus: r.employmentStatus ?? "",
-      contractorID: r.contractorID ?? null,
       probationPeriod: r.probationPeriod ?? "",
       workShiftID: r.workShiftID ?? null,
       attendancePolicyID: r.attendancePolicyID ?? null,
@@ -1264,6 +1262,7 @@ export function ManageEmployeesManagement() {
         departmentNameID: effectiveDeptID,
         designationID: effectiveDesgID,
         managerID: effectiveMgrID,
+
       } as any,
       setFormData
     );
@@ -1679,8 +1678,11 @@ export function ManageEmployeesManagement() {
                     onValueChange={(val) =>
                       setFormData((p) => ({
                         ...p,
+                        contractorID: val === "Company" ? null : p.contractorID,
+                        contrAutocomplete: val === "Company" ? "" : p.contrAutocomplete,
                         promotion: { ...p.promotion, employmentType: val },
                       }))
+
                     }
                   >
                     <SelectTrigger className="w-full">
@@ -1743,10 +1745,15 @@ export function ManageEmployeesManagement() {
                             setFormData((p) => ({
                               ...p,
                               contractorID: c.id,
-                              contrAutocomplete: c.contractorName ?? String(c.id), // ✅ set the right autocomplete field
+                              contrAutocomplete: c.contractorName ?? String(c.id),
+                              promotion: {
+                                ...p.promotion,
+                                employmentType: p.promotion.employmentType || "Contract",
+                              },
                             }));
-                            setContrList([]);                                      // ✅ close the contractor list
+                            setContrList([]);
                           }}
+
                         >
                           {c.contractorName}
                         </div>
@@ -1754,7 +1761,6 @@ export function ManageEmployeesManagement() {
                     </div>
                   )}
                 </div>
-
               </div>
 
               {/* Policy / Shift IDs */}
@@ -1774,11 +1780,9 @@ export function ManageEmployeesManagement() {
                             salaryPayGradeType: val,
                             // clear the opposite side to avoid stale IDs
                             monthlyPayGradeID: val === "Monthly" ? p.promotion.monthlyPayGradeID : null,
-                            hourlyPayGradeID: val === "Hourly" ? p.promotion.hourlyPayGradeID : null,
                           },
                           // also clear the opposite autocomplete text
                           monthlyPGAutocomplete: val === "Monthly" ? p.monthlyPGAutocomplete : "",
-                          hourlyPGAutocomplete: val === "Hourly" ? p.hourlyPGAutocomplete : "",
                         }))
                       }
                     >
@@ -1787,108 +1791,57 @@ export function ManageEmployeesManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Monthly">Monthly</SelectItem>
-                        <SelectItem value="Hourly">Hourly</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {/* Monthly PG (only when Monthly is selected) */}
-                  {formData.promotion.salaryPayGradeType === "Monthly" && (
-                    <div ref={monthlyPGRef} className="space-y-2 relative">
-                      <Label>Monthly Pay Grade</Label>
-                      <Input
-                        value={formData.monthlyPGAutocomplete}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFormData((p) => ({
-                            ...p,
-                            monthlyPGAutocomplete: val,
-                            promotion: { ...p.promotion, monthlyPayGradeID: null }, // clear id while typing
-                          }));
-                          runFetchMonthlyPG(val);
-                        }}
-                        onFocus={(e) => {
-                          const val = e.target.value;
-                          if (val.length >= MIN_CHARS) runFetchMonthlyPG(val);
-                        }}
-                        placeholder="Start typing monthly grade…"
-                        autoComplete="off"
-                      />
-                      {monthlyPGList.length > 0 && (
-                        <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                          {monthlyPGLoading && (
-                            <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
-                          )}
-                          {monthlyPGList.map((g) => (
-                            <div
-                              key={g.id}
-                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setFormData((p) => ({
-                                  ...p,
-                                  monthlyPGAutocomplete: g.monthlyPayGradeName ?? String(g.id),
-                                  promotion: { ...p.promotion, monthlyPayGradeID: g.id },
-                                }));
-                                setMonthlyPGList([]);
-                              }}
-                            >
-                              {g.monthlyPayGradeName}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div ref={monthlyPGRef} className="space-y-2 relative">
+                    <Label>Monthly Pay Grade</Label>
+                    <Input
+                      value={formData.monthlyPGAutocomplete}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((p) => ({
+                          ...p,
+                          monthlyPGAutocomplete: val,
+                          promotion: { ...p.promotion, monthlyPayGradeID: null }, // clear id while typing
+                        }));
+                        runFetchMonthlyPG(val);
+                      }}
+                      onFocus={(e) => {
+                        const val = e.target.value;
+                        if (val.length >= MIN_CHARS) runFetchMonthlyPG(val);
+                      }}
+                      placeholder="Start typing monthly grade…"
+                      autoComplete="off"
+                    />
+                    {monthlyPGList.length > 0 && (
+                      <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                        {monthlyPGLoading && (
+                          <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
+                        )}
+                        {monthlyPGList.map((g) => (
+                          <div
+                            key={g.id}
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setFormData((p) => ({
+                                ...p,
+                                monthlyPGAutocomplete: g.monthlyPayGradeName ?? String(g.id),
+                                promotion: { ...p.promotion, monthlyPayGradeID: g.id },
+                              }));
+                              setMonthlyPGList([]);
+                            }}
+                          >
+                            {g.monthlyPayGradeName}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Hourly PG (only when Hourly is selected) */}
-                  {formData.promotion.salaryPayGradeType === "Hourly" && (
-                    <div ref={hourlyPGRef} className="space-y-2 relative">
-                      <Label>Hourly Pay Grade</Label>
-                      <Input
-                        value={formData.hourlyPGAutocomplete}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFormData((p) => ({
-                            ...p,
-                            hourlyPGAutocomplete: val,
-                            promotion: { ...p.promotion, hourlyPayGradeID: null }, // clear id while typing
-                          }));
-                          runFetchHourlyPG(val);
-                        }}
-                        onFocus={(e) => {
-                          const val = e.target.value;
-                          if (val.length >= MIN_CHARS) runFetchHourlyPG(val);
-                        }}
-                        placeholder="Start typing hourly grade…"
-                        autoComplete="off"
-                      />
-                      {hourlyPGList.length > 0 && (
-                        <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                          {hourlyPGLoading && (
-                            <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>
-                          )}
-                          {hourlyPGList.map((g) => (
-                            <div
-                              key={g.id}
-                              className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setFormData((p) => ({
-                                  ...p,
-                                  hourlyPGAutocomplete: g.hourlyPayGradeName ?? String(g.id),
-                                  promotion: { ...p.promotion, hourlyPayGradeID: g.id },
-                                }));
-                                setHourlyPGList([]);
-                              }}
-                            >
-                              {g.hourlyPayGradeName}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -25,52 +25,36 @@ import {
 import { Badge } from "../components/ui/badge"
 import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2, MapPin } from "lucide-react"
+import { SearchSuggestInput } from "../components/SearchSuggestInput"
 
 interface FieldAttendanceSchedule {
   id: string
-  serviceProvider: string
-  companyName: string
-  branchName: string
-  employeeId: string
-  employeeName: string
-  siteName: string
-  address: string
-  latitude: string
-  longitude: string
+  serviceProviderID?: number
+  companyID?: number
+  branchesID?: number
+  manageEmployeeID?: number
+  serviceProvider?: string
+  companyName?: string
+  branchName?: string
+  employeeId?: string
+  employeeName?: string
+  siteName?: string
+  address?: string
+  latitude?: string
+  longitude?: string
   fromDate: string
   toDate: string
   createdAt: string
 }
 
-// Mock data for dropdowns
-const mockServiceProviders = [
-  "TechCorp Solutions",
-  "Global Services Ltd",
-  "Enterprise Systems",
-  "Digital Innovations"
-]
+interface SelectedItem {
+  display: string
+  value: number
+  item: any
+}
 
-const mockCompanies = [
-  "ABC Corporation",
-  "XYZ Industries",
-  "Tech Solutions Inc",
-  "Global Enterprises"
-]
-
-const mockBranches = [
-  "Mumbai Branch",
-  "Delhi Branch",
-  "Bangalore Branch",
-  "Chennai Branch"
-]
-
-const mockEmployees = [
-  { id: "EMP001", name: "John Doe" },
-  { id: "EMP002", name: "Jane Smith" },
-  { id: "EMP003", name: "Mike Johnson" },
-  { id: "EMP004", name: "Sarah Wilson" },
-  { id: "EMP005", name: "David Brown" }
-]
+// Backend URL
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 export function FieldAttendanceScheduleManagement() {
   const [schedules, setSchedules] = useState<FieldAttendanceSchedule[]>([])
@@ -81,48 +65,219 @@ export function FieldAttendanceScheduleManagement() {
     serviceProvider: "",
     companyName: "",
     branchName: "",
-    employeeId: "",
+    employeeName: "",
     siteName: "",
     address: "",
     latitude: "",
     longitude: "",
     fromDate: "",
-    toDate: ""
+    toDate: "",
+    serviceProviderID: undefined as number | undefined,
+    companyID: undefined as number | undefined,
+    branchesID: undefined as number | undefined,
+    manageEmployeeID: undefined as number | undefined,
   })
 
+  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
+
+  // API functions for search and suggest
+  const fetchServiceProviders = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/service-provider`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.companyName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching service providers:", error)
+      return []
+    }
+  }
+
+  const fetchCompanies = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/company`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.companyName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching companies:", error)
+      return []
+    }
+  }
+
+  const fetchBranches = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/branches`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.branchName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching branches:", error)
+      return []
+    }
+  }
+
+  const fetchEmployees = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/manage-emp`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) => {
+            const fullName = `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim().toLowerCase()
+            const employeeId = (item?.employeeID || "").toLowerCase()
+            return fullName.includes(q) || employeeId.includes(q)
+          }).map((item: any) => ({
+            ...item,
+            displayName: `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim() + (item?.employeeID ? ` (${item.employeeID})` : "")
+          }))
+        : []
+    } catch (error) {
+      console.error("Error fetching employees:", error)
+      return []
+    }
+  }
+
+  // Load field attendance schedules on component mount
+  useEffect(() => {
+    loadFieldAttendanceSchedules()
+  }, [])
+
+  const loadFieldAttendanceSchedules = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/emp-field-site-attendance`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      const schedulesData = (Array.isArray(data) ? data : []).map(
+        (schedule: any) => ({
+          id: schedule.id.toString(),
+          serviceProviderID: schedule.serviceProviderID,
+          companyID: schedule.companyID,
+          branchesID: schedule.branchesID,
+          manageEmployeeID: schedule.manageEmployeeID,
+          serviceProvider: schedule.serviceProvider?.companyName || "",
+          companyName: schedule.company?.companyName || "",
+          branchName: schedule.branches?.branchName || "",
+          employeeId: schedule.manageEmployee?.employeeID || "",
+          employeeName: schedule.manageEmployee ? 
+            `${schedule.manageEmployee.employeeFirstName || ""} ${schedule.manageEmployee.employeeLastName || ""}`.trim() : "",
+          siteName: schedule.siteName,
+          address: schedule.address,
+          latitude: schedule.latitude,
+          longitude: schedule.longitude,
+          fromDate: schedule.fromDate
+            ? new Date(schedule.fromDate).toISOString().split("T")[0]
+            : "",
+          toDate: schedule.toDate
+            ? new Date(schedule.toDate).toISOString().split("T")[0]
+            : "",
+          createdAt: schedule.createdAt
+            ? new Date(schedule.createdAt).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+        })
+      )
+      setSchedules(schedulesData)
+    } catch (error) {
+      console.error("Error loading field attendance schedules:", error)
+    }
+  }
+
   const filteredSchedules = schedules.filter(schedule =>
-    schedule.serviceProvider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    schedule.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    schedule.branchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    schedule.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    schedule.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    schedule.address.toLowerCase().includes(searchTerm.toLowerCase())
+    (schedule.serviceProvider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (schedule.companyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (schedule.branchName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (schedule.employeeName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (schedule.employeeId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (schedule.siteName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (schedule.address || "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleServiceProviderSelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      serviceProvider: selected.display,
+      serviceProviderID: selected.value,
+    }))
+  }
+
+  const handleCompanySelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      companyName: selected.display,
+      companyID: selected.value,
+    }))
+  }
+
+  const handleBranchSelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      branchName: selected.display,
+      branchesID: selected.value,
+    }))
+  }
+
+  const handleEmployeeSelect = (selected: SelectedItem) => {
+    const employee = selected.item
+    setSelectedEmployee(employee)
+    setFormData((prev) => ({
+      ...prev,
+      employeeName: selected.display,
+      manageEmployeeID: selected.value,
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (editingSchedule) {
-      setSchedules(prev => 
-        prev.map(schedule => 
-          schedule.id === editingSchedule.id 
-            ? { ...schedule, ...formData, id: editingSchedule.id, createdAt: editingSchedule.createdAt }
-            : schedule
-        )
-      )
-    } else {
-      const employee = mockEmployees.find(emp => emp.id === formData.employeeId)
-      const newSchedule: FieldAttendanceSchedule = {
-        id: Date.now().toString(),
-        ...formData,
-        employeeName: employee?.name || "",
-        createdAt: new Date().toISOString().split('T')[0]
+    try {
+      const fieldAttendanceScheduleData = {
+        serviceProviderID: formData.serviceProviderID,
+        companyID: formData.companyID,
+        branchesID: formData.branchesID,
+        manageEmployeeID: formData.manageEmployeeID,
+        siteName: formData.siteName,
+        address: formData.address,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        fromDate: formData.fromDate ? new Date(formData.fromDate) : null,
+        toDate: formData.toDate ? new Date(formData.toDate) : null,
       }
-      setSchedules(prev => [...prev, newSchedule])
-    }
-    
+
+      const url = editingSchedule
+        ? `${BACKEND_URL}/emp-field-site-attendance/${editingSchedule.id}`
+        : `${BACKEND_URL}/emp-field-site-attendance`
+      const method = editingSchedule ? "PATCH" : "POST"
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fieldAttendanceScheduleData),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to save field attendance schedule: ${res.status}`)
+      }
+
+      await loadFieldAttendanceSchedules()
     resetForm()
     setIsDialogOpen(false)
+    } catch (error) {
+      console.error("Error saving field attendance schedule:", error)
+    }
   }
 
   const resetForm = () => {
@@ -130,36 +285,60 @@ export function FieldAttendanceScheduleManagement() {
       serviceProvider: "",
       companyName: "",
       branchName: "",
-      employeeId: "",
+      employeeName: "",
       siteName: "",
       address: "",
       latitude: "",
       longitude: "",
       fromDate: "",
-      toDate: ""
+      toDate: "",
+      serviceProviderID: undefined,
+      companyID: undefined,
+      branchesID: undefined,
+      manageEmployeeID: undefined,
     })
+    setSelectedEmployee(null)
     setEditingSchedule(null)
   }
 
   const handleEdit = (schedule: FieldAttendanceSchedule) => {
     setFormData({
-      serviceProvider: schedule.serviceProvider,
-      companyName: schedule.companyName,
-      branchName: schedule.branchName,
-      employeeId: schedule.employeeId,
-      siteName: schedule.siteName,
-      address: schedule.address,
-      latitude: schedule.latitude,
-      longitude: schedule.longitude,
+      serviceProvider: schedule.serviceProvider || "",
+      companyName: schedule.companyName || "",
+      branchName: schedule.branchName || "",
+      employeeName: schedule.employeeName || "",
+      siteName: schedule.siteName || "",
+      address: schedule.address || "",
+      latitude: schedule.latitude || "",
+      longitude: schedule.longitude || "",
       fromDate: schedule.fromDate,
-      toDate: schedule.toDate
+      toDate: schedule.toDate,
+      serviceProviderID: schedule.serviceProviderID,
+      companyID: schedule.companyID,
+      branchesID: schedule.branchesID,
+      manageEmployeeID: schedule.manageEmployeeID,
+    })
+    setSelectedEmployee({
+      employeeID: schedule.employeeId,
+      employeeFirstName: schedule.employeeName?.split(' ')[0] || "",
+      employeeLastName: schedule.employeeName?.split(' ').slice(1).join(' ') || "",
     })
     setEditingSchedule(schedule)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setSchedules(prev => prev.filter(schedule => schedule.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/emp-field-site-attendance/${id}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to delete field attendance schedule: ${res.status}`)
+      }
+      await loadFieldAttendanceSchedules()
+    } catch (error) {
+      console.error("Error deleting field attendance schedule:", error)
+    }
   }
 
   const generateGoogleMapsLink = (latitude: string, longitude: string) => {
@@ -170,7 +349,7 @@ export function FieldAttendanceScheduleManagement() {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto px-4">
+    <div className="space-y-6 w-full max-w-full mx-auto px-4 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="min-w-0 flex-1">
@@ -202,51 +381,45 @@ export function FieldAttendanceScheduleManagement() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Organization Selection</h3>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="serviceProvider">Service Provider *</Label>
-                      <select
-                        id="serviceProvider"
+                    <SearchSuggestInput
+                      label="Service Provider"
+                      placeholder="Select Service Provider"
                         value={formData.serviceProvider}
-                        onChange={(e) => setFormData(prev => ({ ...prev, serviceProvider: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, serviceProvider: value }))
+                      }
+                      onSelect={handleServiceProviderSelect}
+                      fetchData={fetchServiceProviders}
+                      displayField="companyName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Service Provider</option>
-                        {mockServiceProviders.map((provider) => (
-                          <option key={provider} value={provider}>{provider}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyName">Company Name *</Label>
-                      <select
-                        id="companyName"
+                    />
+                    <SearchSuggestInput
+                      label="Company Name"
+                      placeholder="Select Company"
                         value={formData.companyName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, companyName: value }))
+                      }
+                      onSelect={handleCompanySelect}
+                      fetchData={fetchCompanies}
+                      displayField="companyName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Company</option>
-                        {mockCompanies.map((company) => (
-                          <option key={company} value={company}>{company}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="branchName">Branch Name *</Label>
-                      <select
-                        id="branchName"
+                    />
+                    <SearchSuggestInput
+                      label="Branch Name"
+                      placeholder="Select Branch"
                         value={formData.branchName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, branchName: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, branchName: value }))
+                      }
+                      onSelect={handleBranchSelect}
+                      fetchData={fetchBranches}
+                      displayField="branchName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Branch</option>
-                        {mockBranches.map((branch) => (
-                          <option key={branch} value={branch}>{branch}</option>
-                        ))}
-                      </select>
-                    </div>
+                    />
                   </div>
                 </div>
 
@@ -254,29 +427,27 @@ export function FieldAttendanceScheduleManagement() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Employee Selection</h3>
                   <div className="space-y-2">
-                    <Label htmlFor="employeeId">Employee Name *</Label>
-                    <select
-                      id="employeeId"
-                      value={formData.employeeId}
-                      onChange={(e) => setFormData(prev => ({ ...prev, employeeId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <SearchSuggestInput
+                      label="Employee Name"
+                      placeholder="Select Employee"
+                      value={formData.employeeName}
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, employeeName: value }))
+                      }
+                      onSelect={handleEmployeeSelect}
+                      fetchData={fetchEmployees}
+                      displayField="displayName"
+                      valueField="id"
                       required
-                    >
-                      <option value="">Select Employee</option>
-                      {mockEmployees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name} ({employee.id})
-                        </option>
-                      ))}
-                    </select>
+                    />
                     <p className="text-xs text-gray-500">Show FirstName + LastName + Emp ID</p>
                   </div>
-                  {formData.employeeId && (
+                  {/* {selectedEmployee && (
                     <div className="bg-gray-50 p-4 rounded-md">
-                      <h4 className="font-medium text-gray-900 mb-2">Employee ID: {formData.employeeId}</h4>
+                      <h4 className="font-medium text-gray-900 mb-2">Employee ID: {selectedEmployee.employeeID}</h4>
                       <p className="text-sm text-gray-600">Fetch by Name</p>
                     </div>
-                  )}
+                  )} */}
                 </div>
 
                 {/* Site Information */}
@@ -424,31 +595,32 @@ export function FieldAttendanceScheduleManagement() {
             Field Attendance Schedules List
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0 w-full">
-          <div className="overflow-x-auto w-full">
-            <Table className="w-full">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">Service Provider</TableHead>
-                  <TableHead className="w-[120px]">Company Name</TableHead>
-                  <TableHead className="w-[120px]">Branch Name</TableHead>
-                  <TableHead className="w-[100px]">Employee ID</TableHead>
-                  <TableHead className="w-[150px]">Employee Name</TableHead>
-                  <TableHead className="w-[150px]">Site Name</TableHead>
-                  <TableHead className="w-[200px]">Address</TableHead>
-                  <TableHead className="w-[100px]">Latitude</TableHead>
-                  <TableHead className="w-[100px]">Longitude</TableHead>
-                  <TableHead className="w-[150px]">Google Maps Link</TableHead>
-                  <TableHead className="w-[100px]">From Date</TableHead>
-                  <TableHead className="w-[100px]">To Date</TableHead>
-                  <TableHead className="w-[100px]">Created</TableHead>
+                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead className="w-[90px]">Service Provider</TableHead>
+                  <TableHead className="w-[80px]">Company Name</TableHead>
+                  <TableHead className="w-[80px]">Branch Name</TableHead>
+                  <TableHead className="w-[70px]">Employee ID</TableHead>
+                  <TableHead className="w-[100px]">Employee Name</TableHead>
+                  <TableHead className="w-[80px]">Site Name</TableHead>
+                  <TableHead className="w-[120px]">Address</TableHead>
+                  <TableHead className="w-[80px]">Latitude</TableHead>
+                  <TableHead className="w-[80px]">Longitude</TableHead>
+                  <TableHead className="w-[100px]">Google Maps Link</TableHead>
+                  <TableHead className="w-[80px]">From Date</TableHead>
+                  <TableHead className="w-[80px]">To Date</TableHead>
+                  <TableHead className="w-[80px]">Created</TableHead>
                   <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredSchedules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={15} className="text-center py-8 text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <Icon icon="mdi:map-marker-multiple" className="w-12 h-12 text-gray-300" />
                         <p>No field attendance schedules found</p>
@@ -457,17 +629,18 @@ export function FieldAttendanceScheduleManagement() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSchedules.map((schedule) => (
+                  filteredSchedules.map((schedule, index) => (
                     <TableRow key={schedule.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{schedule.serviceProvider}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.branchName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.employeeId}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.employeeName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.siteName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.address}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.latitude}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.longitude}</TableCell>
+                      <TableCell className="font-medium truncate">{index + 1}</TableCell>
+                      <TableCell className="truncate" title={schedule.serviceProvider}>{schedule.serviceProvider}</TableCell>
+                      <TableCell className="truncate" title={schedule.companyName}>{schedule.companyName}</TableCell>
+                      <TableCell className="truncate" title={schedule.branchName}>{schedule.branchName}</TableCell>
+                      <TableCell className="truncate">{schedule.employeeId}</TableCell>
+                      <TableCell className="truncate" title={schedule.employeeName}>{schedule.employeeName}</TableCell>
+                      <TableCell className="truncate" title={schedule.siteName}>{schedule.siteName}</TableCell>
+                      <TableCell className="truncate" title={schedule.address}>{schedule.address}</TableCell>
+                      <TableCell className="truncate">{schedule.latitude}</TableCell>
+                      <TableCell className="truncate">{schedule.longitude}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         {schedule.latitude && schedule.longitude ? (
                           <a 
@@ -483,9 +656,9 @@ export function FieldAttendanceScheduleManagement() {
                           <span className="text-gray-400">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.fromDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.toDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{schedule.createdAt}</TableCell>
+                      <TableCell className="truncate">{schedule.fromDate}</TableCell>
+                      <TableCell className="truncate">{schedule.toDate}</TableCell>
+                      <TableCell className="truncate">{schedule.createdAt}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -493,6 +666,7 @@ export function FieldAttendanceScheduleManagement() {
                             size="sm"
                             onClick={() => handleEdit(schedule)}
                             className="h-7 w-7 p-0"
+                            title="Edit"
                           >
                             <Edit className="w-3 h-3" />
                           </Button>
@@ -501,6 +675,7 @@ export function FieldAttendanceScheduleManagement() {
                             size="sm"
                             onClick={() => handleDelete(schedule.id)}
                             className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Delete"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>

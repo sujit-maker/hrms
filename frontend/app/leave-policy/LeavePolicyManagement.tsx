@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -25,6 +25,7 @@ import {
 import { Badge } from "../components/ui/badge"
 import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { SearchSuggestInput } from "../components/SearchSuggestInput"
 
 interface Holiday {
   id: string
@@ -34,17 +35,20 @@ interface Holiday {
 }
 
 interface LeavePolicy {
-  id: string
-  serviceProvider: string
-  companyName: string
-  branchName: string
-  policyName: string
-  sickLeavePerYear: number
-  casualLeavePerYear: number
-  earnedLeaveWorkingMonths: number
-  earnedLeaveDays: number
+  id: number
+  serviceProviderID?: number
+  companyID?: number
+  branchesID?: number
+  serviceProvider?: string
+  companyName?: string
+  branchName?: string
+  leavePolicyName?: string
+  sickLeaveCount?: string
+  casualLeaveCount?: string
+  earnLeaveWorkingMonths?: string
+  earnLeaveCount?: number
   applicableHolidays: Holiday[]
-  createdAt: string
+  createdAt?: string
 }
 
 // Mock holiday data
@@ -59,64 +63,159 @@ const mockHolidays: Holiday[] = [
   { id: "8", name: "Eid", date: "2024-04-10", type: "Religious" },
 ]
 
+const BACKEND_URL = "http://localhost:8000"
+
 export function LeavePolicyManagement() {
   const [policies, setPolicies] = useState<LeavePolicy[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState<LeavePolicy | null>(null)
   const [formData, setFormData] = useState({
+    serviceProviderID: 0,
+    companyID: 0,
+    branchesID: 0,
     serviceProvider: "",
     companyName: "",
     branchName: "",
-    policyName: "",
-    sickLeavePerYear: 0,
-    casualLeavePerYear: 0,
-    earnedLeaveWorkingMonths: 0,
-    earnedLeaveDays: 0,
+    leavePolicyName: "",
+    sickLeaveCount: 0,
+    casualLeaveCount: 0,
+    earnLeaveWorkingMonths: 0,
+    earnLeaveCount: 0,
     applicableHolidays: [] as Holiday[]
   })
 
+  // API functions
+  const fetchServiceProviders = async (query: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/service-provider`)
+      const data = await response.json()
+      return data.filter((item: any) => 
+        item.companyName?.toLowerCase().includes(query.toLowerCase())
+      )
+    } catch (error) {
+      console.error('Error fetching service providers:', error)
+      return []
+    }
+  }
+
+  const fetchCompanies = async (query: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/company`)
+      const data = await response.json()
+      return data.filter((item: any) => 
+        item.companyName?.toLowerCase().includes(query.toLowerCase())
+      )
+    } catch (error) {
+      console.error('Error fetching companies:', error)
+      return []
+    }
+  }
+
+  const fetchBranches = async (query: string) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/branches`)
+      const data = await response.json()
+      return data.filter((item: any) => 
+        item.branchName?.toLowerCase().includes(query.toLowerCase())
+      )
+    } catch (error) {
+      console.error('Error fetching branches:', error)
+      return []
+    }
+  }
+
+  const loadLeavePolicies = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/leave-policy`)
+      const data = await response.json()
+      
+      // Map the nested data to flattened structure for display
+      const mappedData = data.map((policy: any) => ({
+        ...policy,
+        serviceProvider: policy.serviceProvider?.companyName || "",
+        companyName: policy.company?.companyName || "",
+        branchName: policy.branches?.branchName || ""
+      }))
+      
+      setPolicies(mappedData)
+    } catch (error) {
+      console.error('Error loading leave policies:', error)
+    }
+  }
+
+  useEffect(() => {
+    loadLeavePolicies()
+  }, [])
+
   const filteredPolicies = policies.filter(policy =>
-    policy.policyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    policy.serviceProvider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    policy.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    policy.branchName.toLowerCase().includes(searchTerm.toLowerCase())
+    (policy.leavePolicyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (policy.serviceProvider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (policy.companyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (policy.branchName || "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (editingPolicy) {
-      setPolicies(prev => 
-        prev.map(policy => 
-          policy.id === editingPolicy.id 
-            ? { ...policy, ...formData, id: editingPolicy.id, createdAt: editingPolicy.createdAt }
-            : policy
-        )
-      )
-    } else {
-      const newPolicy: LeavePolicy = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString().split('T')[0]
+    try {
+      const payload = {
+        serviceProviderID: formData.serviceProviderID > 0 ? formData.serviceProviderID : null,
+        companyID: formData.companyID > 0 ? formData.companyID : null,
+        branchesID: formData.branchesID > 0 ? formData.branchesID : null,
+        leavePolicyName: formData.leavePolicyName,
+        sickLeaveCount: formData.sickLeaveCount.toString(),
+        casualLeaveCount: formData.casualLeaveCount.toString(),
+        earnLeaveWorkingMonths: formData.earnLeaveWorkingMonths.toString(),
+        earnLeaveCount: formData.earnLeaveCount
       }
-      setPolicies(prev => [...prev, newPolicy])
+
+      if (editingPolicy) {
+        const response = await fetch(`${BACKEND_URL}/leave-policy/${editingPolicy.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        
+        if (response.ok) {
+          await loadLeavePolicies()
+        }
+      } else {
+        const response = await fetch(`${BACKEND_URL}/leave-policy`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        
+        if (response.ok) {
+          await loadLeavePolicies()
+        }
+      }
+      
+      resetForm()
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error('Error saving leave policy:', error)
     }
-    
-    resetForm()
-    setIsDialogOpen(false)
   }
 
   const resetForm = () => {
     setFormData({
+      serviceProviderID: 0,
+      companyID: 0,
+      branchesID: 0,
       serviceProvider: "",
       companyName: "",
       branchName: "",
-      policyName: "",
-      sickLeavePerYear: 0,
-      casualLeavePerYear: 0,
-      earnedLeaveWorkingMonths: 0,
-      earnedLeaveDays: 0,
+      leavePolicyName: "",
+      sickLeaveCount: 0,
+      casualLeaveCount: 0,
+      earnLeaveWorkingMonths: 0,
+      earnLeaveCount: 0,
       applicableHolidays: []
     })
     setEditingPolicy(null)
@@ -124,36 +223,73 @@ export function LeavePolicyManagement() {
 
   const handleEdit = (policy: LeavePolicy) => {
     setFormData({
-      serviceProvider: policy.serviceProvider,
-      companyName: policy.companyName,
-      branchName: policy.branchName,
-      policyName: policy.policyName,
-      sickLeavePerYear: policy.sickLeavePerYear,
-      casualLeavePerYear: policy.casualLeavePerYear,
-      earnedLeaveWorkingMonths: policy.earnedLeaveWorkingMonths,
-      earnedLeaveDays: policy.earnedLeaveDays,
+      serviceProviderID: policy.serviceProviderID || 0,
+      companyID: policy.companyID || 0,
+      branchesID: policy.branchesID || 0,
+      serviceProvider: policy.serviceProvider || "",
+      companyName: policy.companyName || "",
+      branchName: policy.branchName || "",
+      leavePolicyName: policy.leavePolicyName || "",
+      sickLeaveCount: parseInt(policy.sickLeaveCount || "0") || 0,
+      casualLeaveCount: parseInt(policy.casualLeaveCount || "0") || 0,
+      earnLeaveWorkingMonths: parseInt(policy.earnLeaveWorkingMonths || "0") || 0,
+      earnLeaveCount: policy.earnLeaveCount || 0,
       applicableHolidays: policy.applicableHolidays
     })
     setEditingPolicy(policy)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setPolicies(prev => prev.filter(policy => policy.id !== id))
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/leave-policy/${id}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        await loadLeavePolicies()
+      }
+    } catch (error) {
+      console.error('Error deleting leave policy:', error)
+    }
+  }
+
+  const handleServiceProviderSelect = (item: any) => {
+    setFormData(prev => ({
+      ...prev,
+      serviceProviderID: item.id,
+      serviceProvider: item.companyName
+    }))
+  }
+
+  const handleCompanySelect = (item: any) => {
+    setFormData(prev => ({
+      ...prev,
+      companyID: item.id,
+      companyName: item.companyName
+    }))
+  }
+
+  const handleBranchSelect = (item: any) => {
+    setFormData(prev => ({
+      ...prev,
+      branchesID: item.id,
+      branchName: item.branchName
+    }))
   }
 
   const handleHolidayToggle = (holiday: Holiday) => {
-    const isSelected = formData.applicableHolidays.some(h => h.id === holiday.id)
+    const isSelected = formData.applicableHolidays?.some(h => h.id === holiday.id) || false
     
     if (isSelected) {
       setFormData(prev => ({
         ...prev,
-        applicableHolidays: prev.applicableHolidays.filter(h => h.id !== holiday.id)
+        applicableHolidays: (prev.applicableHolidays || []).filter(h => h.id !== holiday.id)
       }))
     } else {
       setFormData(prev => ({
         ...prev,
-        applicableHolidays: [...prev.applicableHolidays, holiday]
+        applicableHolidays: [...(prev.applicableHolidays || []), holiday]
       }))
     }
   }
@@ -189,55 +325,52 @@ export function LeavePolicyManagement() {
               {/* Basic Information */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="serviceProvider">Service Provider *</Label>
-                  <select
-                    id="serviceProvider"
+                  <SearchSuggestInput
+                    label="Service Provider"
                     value={formData.serviceProvider}
-                    onChange={(e) => setFormData(prev => ({ ...prev, serviceProvider: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(value) => setFormData(prev => ({ ...prev, serviceProvider: value }))}
+                    onSelect={handleServiceProviderSelect}
+                    fetchData={fetchServiceProviders}
+                    placeholder="Select Service Provider"
+                    displayField="companyName"
+                    valueField="id"
                     required
-                  >
-                    <option value="">Select Service Provider</option>
-                    <option value="Provider 1">Provider 1</option>
-                    <option value="Provider 2">Provider 2</option>
-                  </select>
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="companyName">Company Name *</Label>
-                  <select
-                    id="companyName"
+                  <SearchSuggestInput
+                    label="Company Name"
                     value={formData.companyName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(value) => setFormData(prev => ({ ...prev, companyName: value }))}
+                    onSelect={handleCompanySelect}
+                    fetchData={fetchCompanies}
+                    placeholder="Select Company"
+                    displayField="companyName"
+                    valueField="id"
                     required
-                  >
-                    <option value="">Select Company</option>
-                    <option value="Company 1">Company 1</option>
-                    <option value="Company 2">Company 2</option>
-                  </select>
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="branchName">Branch Name *</Label>
-                  <select
-                    id="branchName"
+                  <SearchSuggestInput
+                    label="Branch Name"
                     value={formData.branchName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, branchName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(value) => setFormData(prev => ({ ...prev, branchName: value }))}
+                    onSelect={handleBranchSelect}
+                    fetchData={fetchBranches}
+                    placeholder="Select Branch"
+                    displayField="branchName"
+                    valueField="id"
                     required
-                  >
-                    <option value="">Select Branch</option>
-                    <option value="Branch 1">Branch 1</option>
-                    <option value="Branch 2">Branch 2</option>
-                  </select>
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="policyName">Policy Name *</Label>
+                <Label htmlFor="leavePolicyName">Leave Policy Name *</Label>
                 <Input
-                  id="policyName"
-                  value={formData.policyName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, policyName: e.target.value }))}
+                  id="leavePolicyName"
+                  value={formData.leavePolicyName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, leavePolicyName: e.target.value }))}
                   placeholder="Enter leave policy name"
                   required
                 />
@@ -248,14 +381,16 @@ export function LeavePolicyManagement() {
                 <h3 className="text-lg font-semibold">Leave Configuration</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="sickLeavePerYear">Sick Leave / Per Year *</Label>
+                    <Label htmlFor="sickLeaveCount">Sick Leave / Per Year *</Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        id="sickLeavePerYear"
-                        type="number"
-                        min="0"
-                        value={formData.sickLeavePerYear}
-                        onChange={(e) => setFormData(prev => ({ ...prev, sickLeavePerYear: parseInt(e.target.value) || 0 }))}
+                        id="sickLeaveCount"
+                        type="text"
+                        value={formData.sickLeaveCount}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData(prev => ({ ...prev, sickLeaveCount: parseInt(value) || 0 }));
+                        }}
                         placeholder="0"
                         required
                       />
@@ -263,14 +398,16 @@ export function LeavePolicyManagement() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="casualLeavePerYear">Casual Leave / Per Year *</Label>
+                    <Label htmlFor="casualLeaveCount">Casual Leave / Per Year *</Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        id="casualLeavePerYear"
-                        type="number"
-                        min="0"
-                        value={formData.casualLeavePerYear}
-                        onChange={(e) => setFormData(prev => ({ ...prev, casualLeavePerYear: parseInt(e.target.value) || 0 }))}
+                        id="casualLeaveCount"
+                        type="text"
+                        value={formData.casualLeaveCount}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData(prev => ({ ...prev, casualLeaveCount: parseInt(value) || 0 }));
+                        }}
                         placeholder="0"
                         required
                       />
@@ -285,14 +422,16 @@ export function LeavePolicyManagement() {
                 <h3 className="text-lg font-semibold">Earned Leave Configuration</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="earnedLeaveWorkingMonths">No. of Working Month *</Label>
+                    <Label htmlFor="earnLeaveWorkingMonths">No. of Working Month *</Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        id="earnedLeaveWorkingMonths"
-                        type="number"
-                        min="0"
-                        value={formData.earnedLeaveWorkingMonths}
-                        onChange={(e) => setFormData(prev => ({ ...prev, earnedLeaveWorkingMonths: parseInt(e.target.value) || 0 }))}
+                        id="earnLeaveWorkingMonths"
+                        type="text"
+                        value={formData.earnLeaveWorkingMonths}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData(prev => ({ ...prev, earnLeaveWorkingMonths: parseInt(value) || 0 }));
+                        }}
                         placeholder="0"
                         required
                       />
@@ -300,14 +439,16 @@ export function LeavePolicyManagement() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="earnedLeaveDays">Day of Earn Leave *</Label>
+                    <Label htmlFor="earnLeaveCount">Day of Earn Leave *</Label>
                     <div className="flex items-center gap-2">
                       <Input
-                        id="earnedLeaveDays"
-                        type="number"
-                        min="0"
-                        value={formData.earnedLeaveDays}
-                        onChange={(e) => setFormData(prev => ({ ...prev, earnedLeaveDays: parseInt(e.target.value) || 0 }))}
+                        id="earnLeaveCount"
+                        type="text"
+                        value={formData.earnLeaveCount}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData(prev => ({ ...prev, earnLeaveCount: parseInt(value) || 0 }));
+                        }}
                         placeholder="0"
                         required
                       />
@@ -324,7 +465,7 @@ export function LeavePolicyManagement() {
                   <p className="text-sm text-gray-600 mb-4">Select holidays that apply to this leave policy:</p>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {mockHolidays.map((holiday) => {
-                      const isSelected = formData.applicableHolidays.some(h => h.id === holiday.id)
+                      const isSelected = formData.applicableHolidays?.some(h => h.id === holiday.id) || false
                       return (
                         <div key={holiday.id} className="flex items-center space-x-3 p-2 hover:bg-gray-100 rounded">
                           <input
@@ -351,7 +492,7 @@ export function LeavePolicyManagement() {
                   </div>
                   <div className="mt-3 pt-3 border-t">
                     <p className="text-sm text-gray-600">
-                      Selected: {formData.applicableHolidays.length} holiday(s)
+                      Selected: {formData.applicableHolidays?.length || 0} holiday(s)
                     </p>
                   </div>
                 </div>
@@ -430,20 +571,20 @@ export function LeavePolicyManagement() {
                 ) : (
                   filteredPolicies.map((policy) => (
                     <TableRow key={policy.id}>
-                      <TableCell className="whitespace-nowrap">{policy.serviceProvider}</TableCell>
-                      <TableCell className="whitespace-nowrap">{policy.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{policy.branchName}</TableCell>
-                      <TableCell className="font-medium whitespace-nowrap">{policy.policyName}</TableCell>
-                      <TableCell className="whitespace-nowrap text-center">{policy.sickLeavePerYear}</TableCell>
-                      <TableCell className="whitespace-nowrap text-center">{policy.casualLeavePerYear}</TableCell>
-                      <TableCell className="whitespace-nowrap text-center">{policy.earnedLeaveWorkingMonths}</TableCell>
-                      <TableCell className="whitespace-nowrap text-center">{policy.earnedLeaveDays}</TableCell>
+                      <TableCell className="whitespace-nowrap">{policy.serviceProvider || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{policy.companyName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{policy.branchName || "-"}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{policy.leavePolicyName || "-"}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center">{policy.sickLeaveCount || 0}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center">{policy.casualLeaveCount || 0}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center">{policy.earnLeaveWorkingMonths || 0}</TableCell>
+                      <TableCell className="whitespace-nowrap text-center">{policy.earnLeaveCount || "0"}</TableCell>
                       <TableCell className="whitespace-nowrap text-center">
                         <Badge variant="secondary">
-                          {policy.applicableHolidays.length} holidays
+                          {policy.applicableHolidays?.length || 0} holidays
                         </Badge>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{policy.createdAt}</TableCell>
+                      <TableCell className="whitespace-nowrap">{policy.createdAt || "-"}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           <Button

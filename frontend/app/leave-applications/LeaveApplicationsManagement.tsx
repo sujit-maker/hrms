@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
@@ -25,53 +25,38 @@ import {
 import { Badge } from "../components/ui/badge"
 import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2, Check, X } from "lucide-react"
+import { SearchSuggestInput } from "../components/SearchSuggestInput"
 
 interface LeaveApplication {
   id: string
-  serviceProvider: string
-  companyName: string
-  branchName: string
-  employeeId: string
-  employeeName: string
-  applicationDate: string
-  leaveType: string
+  serviceProviderID?: number
+  companyID?: number
+  branchesID?: number
+  manageEmployeeID?: number
+  serviceProvider?: string
+  companyName?: string
+  branchName?: string
+  employeeId?: string
+  employeeName?: string
+  remainingSickLeave?: number
+  remainingCasualLeave?: number
+  remainingEarnedLeave?: number
+  appliedLeaveType?: string
   fromDate: string
   toDate: string
-  noOfDays: number
-  purpose: string
-  status: "Pending" | "Approved" | "Rejected"
+  purpose?: string
+  status?: "Pending" | "Approved" | "Rejected"
   createdAt: string
 }
 
-// Mock data for dropdowns
-const mockServiceProviders = [
-  "TechCorp Solutions",
-  "Global Services Ltd",
-  "Enterprise Systems",
-  "Digital Innovations"
-]
+interface SelectedItem {
+  display: string
+  value: number
+  item: any
+}
 
-const mockCompanies = [
-  "ABC Corporation",
-  "XYZ Industries",
-  "Tech Solutions Inc",
-  "Global Enterprises"
-]
-
-const mockBranches = [
-  "Mumbai Branch",
-  "Delhi Branch",
-  "Bangalore Branch",
-  "Chennai Branch"
-]
-
-const mockEmployees = [
-  { id: "EMP001", name: "John Doe", sickLeave: 12, casualLeave: 8, earnedLeave: 15 },
-  { id: "EMP002", name: "Jane Smith", sickLeave: 10, casualLeave: 6, earnedLeave: 12 },
-  { id: "EMP003", name: "Mike Johnson", sickLeave: 15, casualLeave: 10, earnedLeave: 18 },
-  { id: "EMP004", name: "Sarah Wilson", sickLeave: 8, casualLeave: 5, earnedLeave: 10 },
-  { id: "EMP005", name: "David Brown", sickLeave: 20, casualLeave: 12, earnedLeave: 25 }
-]
+// Backend URL
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 const mockLeaveTypes = [
   "Sick",
@@ -89,28 +74,180 @@ export function LeaveApplicationsManagement() {
     serviceProvider: "",
     companyName: "",
     branchName: "",
-    employeeId: "",
+    employeeName: "",
     leaveType: "",
     fromDate: "",
     toDate: "",
-    purpose: ""
+    purpose: "",
+    serviceProviderID: undefined as number | undefined,
+    companyID: undefined as number | undefined,
+    branchesID: undefined as number | undefined,
+    manageEmployeeID: undefined as number | undefined,
   })
 
-  const [selectedEmployee, setSelectedEmployee] = useState<typeof mockEmployees[0] | null>(null)
+  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
+
+  // API functions for search and suggest
+  const fetchServiceProviders = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/service-provider`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.companyName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching service providers:", error)
+      return []
+    }
+  }
+
+  const fetchCompanies = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/company`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.companyName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching companies:", error)
+      return []
+    }
+  }
+
+  const fetchBranches = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/branches`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) =>
+            (item?.branchName || "").toLowerCase().includes(q)
+          )
+        : []
+    } catch (error) {
+      console.error("Error fetching branches:", error)
+      return []
+    }
+  }
+
+  const fetchEmployees = async (query: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/manage-emp`, { cache: "no-store" })
+      const data = await res.json()
+      const q = query.toLowerCase()
+      return Array.isArray(data)
+        ? data.filter((item: any) => {
+            const fullName = `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim().toLowerCase()
+            const employeeId = (item?.employeeID || "").toLowerCase()
+            return fullName.includes(q) || employeeId.includes(q)
+          }).map((item: any) => ({
+            ...item,
+            displayName: `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim() + (item?.employeeID ? ` (${item.employeeID})` : "")
+          }))
+        : []
+    } catch (error) {
+      console.error("Error fetching employees:", error)
+      return []
+    }
+  }
+
+  // Load leave applications on component mount
+  useEffect(() => {
+    loadLeaveApplications()
+  }, [])
+
+  const loadLeaveApplications = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/leave-application`, {
+        cache: "no-store",
+      })
+      const data = await res.json()
+      const leaveApplicationsData = (Array.isArray(data) ? data : []).map(
+        (application: any) => ({
+          id: application.id.toString(),
+          serviceProviderID: application.serviceProviderID,
+          companyID: application.companyID,
+          branchesID: application.branchesID,
+          manageEmployeeID: application.manageEmployeeID,
+          serviceProvider: application.serviceProvider?.companyName || "",
+          companyName: application.company?.companyName || "",
+          branchName: application.branches?.branchName || "",
+          employeeId: application.manageEmployee?.employeeID || "",
+          employeeName: application.manageEmployee ? 
+            `${application.manageEmployee.employeeFirstName || ""} ${application.manageEmployee.employeeLastName || ""}`.trim() : "",
+          remainingSickLeave: application.remainingSickLeave,
+          remainingCasualLeave: application.remainingCasualLeave,
+          remainingEarnedLeave: application.remainingEarnedLeave,
+          appliedLeaveType: application.appliedLeaveType,
+          fromDate: application.fromDate
+            ? new Date(application.fromDate).toISOString().split("T")[0]
+            : "",
+          toDate: application.toDate
+            ? new Date(application.toDate).toISOString().split("T")[0]
+            : "",
+          purpose: application.purpose,
+          status: "Pending" as "Pending" | "Approved" | "Rejected",
+          createdAt: application.createdAt
+            ? new Date(application.createdAt).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+        })
+      )
+      setLeaveApplications(leaveApplicationsData)
+    } catch (error) {
+      console.error("Error loading leave applications:", error)
+    }
+  }
 
   const filteredApplications = leaveApplications.filter(application =>
-    application.serviceProvider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    application.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    application.branchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    application.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    application.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    application.leaveType.toLowerCase().includes(searchTerm.toLowerCase())
+    (application.serviceProvider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (application.companyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (application.branchName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (application.employeeName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (application.employeeId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (application.appliedLeaveType || "").toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleEmployeeChange = (employeeId: string) => {
-    const employee = mockEmployees.find(emp => emp.id === employeeId)
-    setSelectedEmployee(employee || null)
-    setFormData(prev => ({ ...prev, employeeId }))
+  const handleServiceProviderSelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      serviceProvider: selected.display,
+      serviceProviderID: selected.value,
+    }))
+  }
+
+  const handleCompanySelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      companyName: selected.display,
+      companyID: selected.value,
+    }))
+  }
+
+  const handleBranchSelect = (selected: SelectedItem) => {
+    setFormData((prev) => ({
+      ...prev,
+      branchName: selected.display,
+      branchesID: selected.value,
+    }))
+  }
+
+  const handleEmployeeSelect = (selected: SelectedItem) => {
+    const employee = selected.item
+    const fullName = `${employee?.employeeFirstName || ""} ${employee?.employeeLastName || ""}`.trim()
+    setSelectedEmployee(employee)
+    setFormData((prev) => ({
+      ...prev,
+      employeeName: selected.display,
+      manageEmployeeID: selected.value,
+    }))
   }
 
   const calculateDays = (fromDate: string, toDate: string) => {
@@ -122,42 +259,44 @@ export function LeaveApplicationsManagement() {
     return diffDays
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    const noOfDays = calculateDays(formData.fromDate, formData.toDate)
-    const employee = mockEmployees.find(emp => emp.id === formData.employeeId)
-    
-    if (editingApplication) {
-      setLeaveApplications(prev => 
-        prev.map(application => 
-          application.id === editingApplication.id 
-            ? { 
-                ...application, 
-                ...formData, 
-                id: editingApplication.id, 
-                createdAt: editingApplication.createdAt,
-                noOfDays,
-                employeeName: employee?.name || ""
-              }
-            : application
-        )
-      )
-    } else {
-      const newApplication: LeaveApplication = {
-        id: Date.now().toString(),
-        ...formData,
-        employeeName: employee?.name || "",
-        applicationDate: new Date().toISOString().split('T')[0],
-        noOfDays,
-        status: "Pending",
-        createdAt: new Date().toISOString().split('T')[0]
+    try {
+      const leaveApplicationData = {
+        serviceProviderID: formData.serviceProviderID,
+        companyID: formData.companyID,
+        branchesID: formData.branchesID,
+        manageEmployeeID: formData.manageEmployeeID,
+        remainingSickLeave: selectedEmployee?.remainingSickLeave || 0,
+        remainingCasualLeave: selectedEmployee?.remainingCasualLeave || 0,
+        remainingEarnedLeave: selectedEmployee?.remainingEarnedLeave || 0,
+        appliedLeaveType: formData.leaveType,
+        fromDate: formData.fromDate ? new Date(formData.fromDate) : null,
+        toDate: formData.toDate ? new Date(formData.toDate) : null,
+        purpose: formData.purpose,
       }
-      setLeaveApplications(prev => [...prev, newApplication])
-    }
-    
+
+      const url = editingApplication
+        ? `${BACKEND_URL}/leave-application/${editingApplication.id}`
+        : `${BACKEND_URL}/leave-application`
+      const method = editingApplication ? "PATCH" : "POST"
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(leaveApplicationData),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to save leave application: ${res.status}`)
+      }
+
+      await loadLeaveApplications()
     resetForm()
     setIsDialogOpen(false)
+    } catch (error) {
+      console.error("Error saving leave application:", error)
+    }
   }
 
   const resetForm = () => {
@@ -165,35 +304,56 @@ export function LeaveApplicationsManagement() {
       serviceProvider: "",
       companyName: "",
       branchName: "",
-      employeeId: "",
+      employeeName: "",
       leaveType: "",
       fromDate: "",
       toDate: "",
-      purpose: ""
+      purpose: "",
+      serviceProviderID: undefined,
+      companyID: undefined,
+      branchesID: undefined,
+      manageEmployeeID: undefined,
     })
     setSelectedEmployee(null)
     setEditingApplication(null)
   }
 
   const handleEdit = (application: LeaveApplication) => {
-    const employee = mockEmployees.find(emp => emp.id === application.employeeId)
     setFormData({
-      serviceProvider: application.serviceProvider,
-      companyName: application.companyName,
-      branchName: application.branchName,
-      employeeId: application.employeeId,
-      leaveType: application.leaveType,
+      serviceProvider: application.serviceProvider || "",
+      companyName: application.companyName || "",
+      branchName: application.branchName || "",
+      employeeName: application.employeeName || "",
+      leaveType: application.appliedLeaveType || "",
       fromDate: application.fromDate,
       toDate: application.toDate,
-      purpose: application.purpose
+      purpose: application.purpose || "",
+      serviceProviderID: application.serviceProviderID,
+      companyID: application.companyID,
+      branchesID: application.branchesID,
+      manageEmployeeID: application.manageEmployeeID,
     })
-    setSelectedEmployee(employee || null)
+    setSelectedEmployee({
+      remainingSickLeave: application.remainingSickLeave,
+      remainingCasualLeave: application.remainingCasualLeave,
+      remainingEarnedLeave: application.remainingEarnedLeave,
+    })
     setEditingApplication(application)
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    setLeaveApplications(prev => prev.filter(application => application.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/leave-application/${id}`, {
+        method: "DELETE",
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to delete leave application: ${res.status}`)
+      }
+      await loadLeaveApplications()
+    } catch (error) {
+      console.error("Error deleting leave application:", error)
+    }
   }
 
   const handleApprove = (id: string) => {
@@ -217,7 +377,7 @@ export function LeaveApplicationsManagement() {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto px-4">
+    <div className="space-y-6 w-full max-w-full mx-auto px-4 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="min-w-0 flex-1">
@@ -249,51 +409,45 @@ export function LeaveApplicationsManagement() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Organization Selection</h3>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="serviceProvider">Service Provider *</Label>
-                      <select
-                        id="serviceProvider"
+                    <SearchSuggestInput
+                      label="Service Provider"
+                      placeholder="Select Service Provider"
                         value={formData.serviceProvider}
-                        onChange={(e) => setFormData(prev => ({ ...prev, serviceProvider: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, serviceProvider: value }))
+                      }
+                      onSelect={handleServiceProviderSelect}
+                      fetchData={fetchServiceProviders}
+                      displayField="companyName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Service Provider</option>
-                        {mockServiceProviders.map((provider) => (
-                          <option key={provider} value={provider}>{provider}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="companyName">Company Name *</Label>
-                      <select
-                        id="companyName"
+                    />
+                    <SearchSuggestInput
+                      label="Company Name"
+                      placeholder="Select Company"
                         value={formData.companyName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, companyName: value }))
+                      }
+                      onSelect={handleCompanySelect}
+                      fetchData={fetchCompanies}
+                      displayField="companyName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Company</option>
-                        {mockCompanies.map((company) => (
-                          <option key={company} value={company}>{company}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="branchName">Branch Name *</Label>
-                      <select
-                        id="branchName"
+                    />
+                    <SearchSuggestInput
+                      label="Branch Name"
+                      placeholder="Select Branch"
                         value={formData.branchName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, branchName: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, branchName: value }))
+                      }
+                      onSelect={handleBranchSelect}
+                      fetchData={fetchBranches}
+                      displayField="branchName"
+                      valueField="id"
                         required
-                      >
-                        <option value="">Select Branch</option>
-                        {mockBranches.map((branch) => (
-                          <option key={branch} value={branch}>{branch}</option>
-                        ))}
-                      </select>
-                    </div>
+                    />
                   </div>
                 </div>
 
@@ -301,54 +455,52 @@ export function LeaveApplicationsManagement() {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Employee Selection</h3>
                   <div className="space-y-2">
-                    <Label htmlFor="employeeId">Employee Name *</Label>
-                    <select
-                      id="employeeId"
-                      value={formData.employeeId}
-                      onChange={(e) => handleEmployeeChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <SearchSuggestInput
+                      label="Employee Name"
+                      placeholder="Select Employee"
+                      value={formData.employeeName}
+                      onChange={(value) =>
+                        setFormData((prev) => ({ ...prev, employeeName: value }))
+                      }
+                      onSelect={handleEmployeeSelect}
+                      fetchData={fetchEmployees}
+                      displayField="displayName"
+                      valueField="id"
                       required
-                    >
-                      <option value="">Select Employee</option>
-                      {mockEmployees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name} ({employee.id})
-                        </option>
-                      ))}
-                    </select>
+                    />
                     <p className="text-xs text-gray-500">Show FirstName + LastName + Emp ID</p>
                   </div>
-                  {selectedEmployee && (
+                  {/* {selectedEmployee && (
                     <div className="bg-gray-50 p-4 rounded-md">
-                      <h4 className="font-medium text-gray-900 mb-2">Employee ID: {selectedEmployee.id}</h4>
+                      <h4 className="font-medium text-gray-900 mb-2">Employee ID: {selectedEmployee.employeeID}</h4>
                       <p className="text-sm text-gray-600">Fetch by Name</p>
                     </div>
-                  )}
+                  )} */}
                 </div>
 
-                {/* Leave Balance Display */}
+                {/* Leave Balance Display
                 {selectedEmployee && (
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Leave Balance</h3>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="bg-blue-50 p-4 rounded-md text-center">
                         <h4 className="font-medium text-blue-900">Sick Leave</h4>
-                        <p className="text-2xl font-bold text-blue-600">{selectedEmployee.sickLeave}</p>
+                        <p className="text-2xl font-bold text-blue-600">{selectedEmployee.remainingSickLeave || 0}</p>
                         <p className="text-xs text-gray-500">Show remaining</p>
                       </div>
                       <div className="bg-green-50 p-4 rounded-md text-center">
                         <h4 className="font-medium text-green-900">Casual Leave</h4>
-                        <p className="text-2xl font-bold text-green-600">{selectedEmployee.casualLeave}</p>
+                        <p className="text-2xl font-bold text-green-600">{selectedEmployee.remainingCasualLeave || 0}</p>
                         <p className="text-xs text-gray-500">Show remaining</p>
                       </div>
                       <div className="bg-purple-50 p-4 rounded-md text-center">
                         <h4 className="font-medium text-purple-900">Earned Leave</h4>
-                        <p className="text-2xl font-bold text-purple-600">{selectedEmployee.earnedLeave}</p>
+                        <p className="text-2xl font-bold text-purple-600">{selectedEmployee.remainingEarnedLeave || 0}</p>
                         <p className="text-xs text-gray-500">Show remaining</p>
                       </div>
                     </div>
                   </div>
-                )}
+                )} */}
 
                 {/* Leave Application Details */}
                 <div className="space-y-4">
@@ -456,31 +608,30 @@ export function LeaveApplicationsManagement() {
             Leave Application Request
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-0 w-full">
-          <div className="overflow-x-auto w-full">
-            <Table className="w-full">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto max-w-full">
+            <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">#</TableHead>
-                  <TableHead className="w-[120px]">Service Provider</TableHead>
-                  <TableHead className="w-[120px]">Company Name</TableHead>
-                  <TableHead className="w-[120px]">Branch Name</TableHead>
-                  <TableHead className="w-[100px]">Employee ID</TableHead>
-                  <TableHead className="w-[150px]">Employee Name</TableHead>
-                  <TableHead className="w-[120px]">Application Date</TableHead>
-                  <TableHead className="w-[100px]">Leave Type</TableHead>
-                  <TableHead className="w-[100px]">From Date</TableHead>
-                  <TableHead className="w-[100px]">To Date</TableHead>
-                  <TableHead className="w-[100px]">No of Days</TableHead>
-                  <TableHead className="w-[150px]">Purpose</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[120px] text-right">Action</TableHead>
+                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead className="w-[90px]">Service Provider</TableHead>
+                  <TableHead className="w-[80px]">Company Name</TableHead>
+                  <TableHead className="w-[80px]">Branch Name</TableHead>
+                  <TableHead className="w-[70px]">Employee ID</TableHead>
+                  <TableHead className="w-[100px]">Employee Name</TableHead>
+                  <TableHead className="w-[70px]">Leave Type</TableHead>
+                  <TableHead className="w-[70px]">From Date</TableHead>
+                  <TableHead className="w-[70px]">To Date</TableHead>
+                  <TableHead className="w-[60px]">No of Days</TableHead>
+                  <TableHead className="w-[80px]">Purpose</TableHead>
+                  <TableHead className="w-[70px]">Status</TableHead>
+                  <TableHead className="w-[80px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredApplications.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={13} className="text-center py-8 text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <Icon icon="mdi:calendar-clock" className="w-12 h-12 text-gray-300" />
                         <p>No leave applications found</p>
@@ -491,18 +642,17 @@ export function LeaveApplicationsManagement() {
                 ) : (
                   filteredApplications.map((application, index) => (
                     <TableRow key={application.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{index + 1}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.serviceProvider}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.branchName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.employeeId}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.employeeName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.applicationDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.leaveType}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.fromDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.toDate}</TableCell>
-                      <TableCell className="whitespace-nowrap text-center">{application.noOfDays}</TableCell>
-                      <TableCell className="whitespace-nowrap">{application.purpose}</TableCell>
+                      <TableCell className="font-medium truncate">{index + 1}</TableCell>
+                      <TableCell className="truncate" title={application.serviceProvider}>{application.serviceProvider}</TableCell>
+                      <TableCell className="truncate" title={application.companyName}>{application.companyName}</TableCell>
+                      <TableCell className="truncate" title={application.branchName}>{application.branchName}</TableCell>
+                      <TableCell className="truncate">{application.employeeId}</TableCell>
+                      <TableCell className="truncate" title={application.employeeName}>{application.employeeName}</TableCell>
+                      <TableCell className="truncate">{application.appliedLeaveType}</TableCell>
+                      <TableCell className="truncate">{application.fromDate}</TableCell>
+                      <TableCell className="truncate">{application.toDate}</TableCell>
+                      <TableCell className="truncate text-center">{calculateDays(application.fromDate, application.toDate)}</TableCell>
+                      <TableCell className="truncate" title={application.purpose}>{application.purpose}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         <Badge variant={
                           application.status === "Approved" ? "default" : 
