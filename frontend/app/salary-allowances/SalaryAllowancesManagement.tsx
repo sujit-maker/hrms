@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
-import { Button } from "../components/ui/button"
-import { Input } from "../components/ui/input"
-import { Label } from "../components/ui/label"
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../components/ui/dialog"
+} from "../components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -21,99 +21,287 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../components/ui/table"
-import { Badge } from "../components/ui/badge"
-import { Icon } from "@iconify/react"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+} from "../components/ui/table";
+import { Badge } from "../components/ui/badge";
+import { Icon } from "@iconify/react";
+import { Plus, Search, Edit, Trash2 } from "lucide-react";
 
 interface SalaryAllowance {
-  id: string
-  serviceProvider: string
-  companyName: string
-  branchName: string
-  allowanceName: string
-  allowanceType: "Fixed" | "Percentage"
-  value: number
-  perMonthLimit: number
-  createdAt: string
+  id: string;
+  serviceProvider: string;
+  companyName: string;
+  branchName: string;
+  allowanceName: string;
+  allowanceType: "Fixed" | "Percentage";
+  value: number;
+  perMonthLimit: number;
+  createdAt: string;
 }
 
+type ApiSalaryAllowance = {
+  id: number;
+  serviceProviderID: number | null;
+  companyID: number | null;
+  branchesID: number | null;
+  salaryAllowanceName: string | null;
+  salaryAllowanceType: string | null; // "Fixed" | "Percentage" (stored as string)
+  salaryAllowanceValue: string | null; // keep as string in DB
+  salaryAllowanceMonthLimit: string | null; // keep as string in DB
+  serviceProvider?: { id: number; companyName?: string | null } | null;
+  company?: { id: number; companyName?: string | null } | null;
+  branches?: { id: number; branchName?: string | null } | null;
+  createdAt?: string;
+};
+
+type SP = { id: number; companyName?: string | null };
+type CO = { id: number; companyName?: string | null };
+type BR = { id: number; branchName?: string | null };
+
+// ---- API endpoints ----
+const API = {
+  allowance: "http://localhost:8000/salary-allowance",
+  serviceProviders: "http://localhost:8000/service-provider",
+  companies: "http://localhost:8000/company",
+  branches: "http://localhost:8000/branches",
+};
+
+const MIN_CHARS = 1;
+
 export function SalaryAllowancesManagement() {
-  const [allowances, setAllowances] = useState<SalaryAllowance[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingAllowance, setEditingAllowance] = useState<SalaryAllowance | null>(null)
+  const [allowances, setAllowances] = useState<SalaryAllowance[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingAllowance, setEditingAllowance] = useState<SalaryAllowance | null>(null);
+
+  // form state: IDs + autocomplete text + fields
   const [formData, setFormData] = useState({
-    serviceProvider: "",
-    companyName: "",
-    branchName: "",
+    serviceProviderID: null as number | null,
+    companyID: null as number | null,
+    branchesID: null as number | null,
+    spAutocomplete: "",
+    coAutocomplete: "",
+    brAutocomplete: "",
     allowanceName: "",
     allowanceType: "Fixed" as "Fixed" | "Percentage",
     value: 0,
-    perMonthLimit: 0
-  })
+    perMonthLimit: 0,
+  });
 
-  const filteredAllowances = allowances.filter(allowance =>
-    allowance.allowanceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    allowance.serviceProvider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    allowance.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    allowance.branchName.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Autocomplete lists/flags + refs
+  const [spList, setSpList] = useState<SP[]>([]);
+  const [coList, setCoList] = useState<CO[]>([]);
+  const [brList, setBrList] = useState<BR[]>([]);
+  const [spLoading, setSpLoading] = useState(false);
+  const [coLoading, setCoLoading] = useState(false);
+  const [brLoading, setBrLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (editingAllowance) {
-      setAllowances(prev => 
-        prev.map(allowance => 
-          allowance.id === editingAllowance.id 
-            ? { ...allowance, ...formData, id: editingAllowance.id, createdAt: editingAllowance.createdAt }
-            : allowance
-        )
-      )
-    } else {
-      const newAllowance: SalaryAllowance = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString().split('T')[0]
-      }
-      setAllowances(prev => [...prev, newAllowance])
+  const spRef = useRef<HTMLDivElement | null>(null);
+  const coRef = useRef<HTMLDivElement | null>(null);
+  const brRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      const t = e.target as Node;
+      if (spRef.current && !spRef.current.contains(t)) setSpList([]);
+      if (coRef.current && !coRef.current.contains(t)) setCoList([]);
+      if (brRef.current && !brRef.current.contains(t)) setBrList([]);
     }
-    
-    resetForm()
-    setIsDialogOpen(false)
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(API.allowance);
+        const data: ApiSalaryAllowance[] = await res.json();
+        setAllowances(data.map(mapApiToUi));
+      } catch (e) {
+        console.error("Failed to load allowances", e);
+      }
+    })();
+  }, []);
+
+  // Mappers
+  function mapApiToUi(x: ApiSalaryAllowance): SalaryAllowance {
+    return {
+      id: String(x.id),
+      serviceProvider: x.serviceProvider?.companyName ?? "-",
+      companyName: x.company?.companyName ?? "-",
+      branchName: x.branches?.branchName ?? "-",
+      allowanceName: x.salaryAllowanceName ?? "-",
+      allowanceType: ((x.salaryAllowanceType ?? "Fixed") === "Percentage" ? "Percentage" : "Fixed") as
+        | "Fixed"
+        | "Percentage",
+      value: safeNum(x.salaryAllowanceValue, 0),
+      perMonthLimit: safeNum(x.salaryAllowanceMonthLimit, 0),
+      createdAt: x.createdAt ? x.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
+    };
   }
 
-  const resetForm = () => {
-    setFormData({
-      serviceProvider: "",
-      companyName: "",
-      branchName: "",
-      allowanceName: "",
-      allowanceType: "Fixed",
-      value: 0,
-      perMonthLimit: 0
-    })
-    setEditingAllowance(null)
+  function mapUiToPayload(fd: typeof formData) {
+    return {
+      serviceProviderID: fd.serviceProviderID,
+      companyID: fd.companyID,
+      branchesID: fd.branchesID,
+      salaryAllowanceName: fd.allowanceName,
+      salaryAllowanceType: fd.allowanceType, // store as string
+      salaryAllowanceValue: String(fd.value ?? 0),
+      salaryAllowanceMonthLimit: String(fd.perMonthLimit ?? 0),
+    };
   }
+
+  function safeNum(v: string | null | undefined, d = 0) {
+    const n = parseFloat(v ?? "");
+    return Number.isFinite(n) ? n : d;
+  }
+
+  async function robustGet(url: string, q?: string) {
+    try {
+      const res = await fetch(q ? `${url}?q=${encodeURIComponent(q)}` : url);
+      if (!res.ok) throw new Error(String(res.status));
+      return res.json();
+    } catch {
+      const res2 = await fetch(url);
+      if (!res2.ok) throw new Error(String(res2.status));
+      return res2.json();
+    }
+  }
+
+  // debounced autocomplete
+  const runFetchSP = debounce(async (val: string) => {
+    if (!val || val.length < MIN_CHARS) return setSpList([]);
+    setSpLoading(true);
+    try {
+      const list: SP[] = await robustGet(API.serviceProviders, val);
+      const filtered = list.filter((x) => (x.companyName ?? "").toLowerCase().includes(val.toLowerCase()));
+      setSpList(filtered.slice(0, 50));
+    } catch (e) {
+      console.error("SP fetch error", e);
+      setSpList([]);
+    } finally {
+      setSpLoading(false);
+    }
+  }, 250);
+
+  const runFetchCO = debounce(async (val: string) => {
+    if (!val || val.length < MIN_CHARS) return setCoList([]);
+    setCoLoading(true);
+    try {
+      const list: CO[] = await robustGet(API.companies, val);
+      const filtered = list.filter((x) => (x.companyName ?? "").toLowerCase().includes(val.toLowerCase()));
+      setCoList(filtered.slice(0, 50));
+    } catch (e) {
+      console.error("CO fetch error", e);
+      setCoList([]);
+    } finally {
+      setCoLoading(false);
+    }
+  }, 250);
+
+  const runFetchBR = debounce(async (val: string) => {
+    if (!val || val.length < MIN_CHARS) return setBrList([]);
+    setBrLoading(true);
+    try {
+      const list: BR[] = await robustGet(API.branches, val);
+      const filtered = list.filter((x) => (x.branchName ?? "").toLowerCase().includes(val.toLowerCase()));
+      setBrList(filtered.slice(0, 50));
+    } catch (e) {
+      console.error("BR fetch error", e);
+      setBrList([]);
+    } finally {
+      setBrLoading(false);
+    }
+  }, 250);
+
+  // CRUD
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload = mapUiToPayload(formData);
+
+    try {
+      if (editingAllowance) {
+        const res = await fetch(`${API.allowance}/${editingAllowance.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const updated: ApiSalaryAllowance = await res.json();
+        setAllowances((prev) => prev.map((a) => (a.id === String(updated.id) ? mapApiToUi(updated) : a)));
+      } else {
+        const res = await fetch(API.allowance, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const created: ApiSalaryAllowance = await res.json();
+        setAllowances((prev) => [mapApiToUi(created), ...prev]);
+      }
+      resetForm();
+      setIsDialogOpen(false);
+    } catch (e) {
+      console.error("Save failed", e);
+    }
+  };
 
   const handleEdit = (allowance: SalaryAllowance) => {
-    setFormData({
-      serviceProvider: allowance.serviceProvider,
-      companyName: allowance.companyName,
-      branchName: allowance.branchName,
+    setFormData((p) => ({
+      ...p,
+      serviceProviderID: null,
+      companyID: null,
+      branchesID: null,
+      spAutocomplete: allowance.serviceProvider || "",
+      coAutocomplete: allowance.companyName || "",
+      brAutocomplete: allowance.branchName || "",
       allowanceName: allowance.allowanceName,
       allowanceType: allowance.allowanceType,
       value: allowance.value,
-      perMonthLimit: allowance.perMonthLimit
-    })
-    setEditingAllowance(allowance)
-    setIsDialogOpen(true)
-  }
+      perMonthLimit: allowance.perMonthLimit,
+    }));
+    setEditingAllowance(allowance);
+    setIsDialogOpen(true);
+  };
 
-  const handleDelete = (id: string) => {
-    setAllowances(prev => prev.filter(allowance => allowance.id !== id))
-  }
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`${API.allowance}/${id}`, { method: "DELETE" });
+      setAllowances((prev) => prev.filter((a) => a.id !== id));
+    } catch (e) {
+      console.error("Delete failed", e);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      serviceProviderID: null,
+      companyID: null,
+      branchesID: null,
+      spAutocomplete: "",
+      coAutocomplete: "",
+      brAutocomplete: "",
+      allowanceName: "",
+      allowanceType: "Fixed",
+      value: 0,
+      perMonthLimit: 0,
+    });
+    setEditingAllowance(null);
+    setSpList([]);
+    setCoList([]);
+    setBrList([]);
+  };
+
+  const filteredAllowances = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return allowances.filter(
+      (a) =>
+        a.allowanceName.toLowerCase().includes(q) ||
+        a.serviceProvider.toLowerCase().includes(q) ||
+        a.companyName.toLowerCase().includes(q) ||
+        a.branchName.toLowerCase().includes(q)
+    );
+  }, [allowances, searchTerm]);
 
   return (
     <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
@@ -123,7 +311,7 @@ export function SalaryAllowancesManagement() {
           <h1 className="text-2xl font-bold text-gray-900">Salary Allowances</h1>
           <p className="text-gray-600 mt-1 text-sm">Manage salary allowances and benefits</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) resetForm(); }}>
           <DialogTrigger asChild>
             <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-sm px-3 py-2">
               <Plus className="w-4 h-4 mr-1" />
@@ -136,56 +324,139 @@ export function SalaryAllowancesManagement() {
                 {editingAllowance ? "Edit Salary Allowance" : "Add New Salary Allowance"}
               </DialogTitle>
               <DialogDescription>
-                {editingAllowance 
-                  ? "Update the salary allowance information below." 
-                  : "Fill in the details to add a new salary allowance."
-                }
+                {editingAllowance
+                  ? "Update the salary allowance information below."
+                  : "Fill in the details to add a new salary allowance."}
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Basic Information */}
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="serviceProvider">Service Provider *</Label>
-                  <select
-                    id="serviceProvider"
-                    value={formData.serviceProvider}
-                    onChange={(e) => setFormData(prev => ({ ...prev, serviceProvider: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {/* Service Provider Autocomplete */}
+                <div ref={spRef} className="space-y-2 relative">
+                  <Label>Service Provider *</Label>
+                  <Input
+                    value={formData.spAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({ ...p, spAutocomplete: val, serviceProviderID: null }));
+                      runFetchSP(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchSP(val);
+                    }}
+                    placeholder="Start typing service provider…"
+                    autoComplete="off"
                     required
-                  >
-                    <option value="">Select Service Provider</option>
-                    <option value="Provider 1">Provider 1</option>
-                    <option value="Provider 2">Provider 2</option>
-                  </select>
+                  />
+                  {spList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {spLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {spList.map((sp) => (
+                        <div
+                          key={sp.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((p) => ({
+                              ...p,
+                              serviceProviderID: sp.id,
+                              spAutocomplete: sp.companyName ?? "",
+                            }));
+                            setSpList([]);
+                          }}
+                        >
+                          {sp.companyName}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="companyName">Company Name *</Label>
-                  <select
-                    id="companyName"
-                    value={formData.companyName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+                {/* Company Autocomplete */}
+                <div ref={coRef} className="space-y-2 relative">
+                  <Label>Company *</Label>
+                  <Input
+                    value={formData.coAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({ ...p, coAutocomplete: val, companyID: null }));
+                      runFetchCO(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchCO(val);
+                    }}
+                    placeholder="Start typing company…"
+                    autoComplete="off"
                     required
-                  >
-                    <option value="">Select Company</option>
-                    <option value="Company 1">Company 1</option>
-                    <option value="Company 2">Company 2</option>
-                  </select>
+                  />
+                  {coList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {coLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {coList.map((co) => (
+                        <div
+                          key={co.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((p) => ({
+                              ...p,
+                              companyID: co.id,
+                              coAutocomplete: co.companyName ?? "",
+                            }));
+                            setCoList([]);
+                          }}
+                        >
+                          {co.companyName}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="branchName">Branch Name *</Label>
-                  <select
-                    id="branchName"
-                    value={formData.branchName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, branchName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+                {/* Branch Autocomplete */}
+                <div ref={brRef} className="space-y-2 relative">
+                  <Label>Branch *</Label>
+                  <Input
+                    value={formData.brAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({ ...p, brAutocomplete: val, branchesID: null }));
+                      runFetchBR(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchBR(val);
+                    }}
+                    placeholder="Start typing branch…"
+                    autoComplete="off"
                     required
-                  >
-                    <option value="">Select Branch</option>
-                    <option value="Branch 1">Branch 1</option>
-                    <option value="Branch 2">Branch 2</option>
-                  </select>
+                  />
+                  {brList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {brLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {brList.map((br) => (
+                        <div
+                          key={br.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((p) => ({
+                              ...p,
+                              branchesID: br.id,
+                              brAutocomplete: br.branchName ?? "",
+                            }));
+                            setBrList([]);
+                          }}
+                        >
+                          {br.branchName}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -194,7 +465,7 @@ export function SalaryAllowancesManagement() {
                 <Input
                   id="allowanceName"
                   value={formData.allowanceName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, allowanceName: e.target.value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, allowanceName: e.target.value }))}
                   placeholder="Enter allowance name"
                   required
                 />
@@ -208,7 +479,12 @@ export function SalaryAllowancesManagement() {
                   <select
                     id="allowanceType"
                     value={formData.allowanceType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, allowanceType: e.target.value as "Fixed" | "Percentage" }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        allowanceType: e.target.value as "Fixed" | "Percentage",
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
@@ -226,7 +502,9 @@ export function SalaryAllowancesManagement() {
                         min="0"
                         step="0.01"
                         value={formData.value}
-                        onChange={(e) => setFormData(prev => ({ ...prev, value: parseFloat(e.target.value) || 0 }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, value: parseFloat(e.target.value) || 0 }))
+                        }
                         placeholder="0"
                         required
                       />
@@ -235,10 +513,9 @@ export function SalaryAllowancesManagement() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-500">
-                      {formData.allowanceType === "Percentage" 
-                        ? "Percentage of base salary" 
-                        : "Fixed amount in currency"
-                      }
+                      {formData.allowanceType === "Percentage"
+                        ? "Percentage of base salary"
+                        : "Fixed amount in currency"}
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -250,7 +527,12 @@ export function SalaryAllowancesManagement() {
                         min="0"
                         step="0.01"
                         value={formData.perMonthLimit}
-                        onChange={(e) => setFormData(prev => ({ ...prev, perMonthLimit: parseFloat(e.target.value) || 0 }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            perMonthLimit: parseFloat(e.target.value) || 0,
+                          }))
+                        }
                         placeholder="0"
                         required
                       />
@@ -342,14 +624,9 @@ export function SalaryAllowancesManagement() {
                         </Badge>
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-center">
-                        {allowance.allowanceType === "Percentage" 
-                          ? `${allowance.value}%` 
-                          : `₹${allowance.value}`
-                        }
+                        {allowance.allowanceType === "Percentage" ? `${allowance.value}%` : `₹${allowance.value}`}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-center">
-                        ₹{allowance.perMonthLimit}
-                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-center">₹{allowance.perMonthLimit}</TableCell>
                       <TableCell className="whitespace-nowrap">{allowance.createdAt}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
@@ -380,5 +657,14 @@ export function SalaryAllowancesManagement() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
+}
+
+/** simple debounce */
+function debounce<T extends (...args: any[]) => any>(fn: T, ms = 300) {
+  let t: any;
+  return (...args: Parameters<T>) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
 }

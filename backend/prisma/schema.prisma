@@ -59,6 +59,18 @@ model BonusSetup {
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   genarateBonus     GenarateBonus[]
+  bonusAllocation  BonusAllocation[]
+}
+
+
+model BonusAllocation {	
+id Int @id @default(autoincrement())
+bonusSetupID Int
+financialYear   Int?
+salaryPeriod   Int?
+employeeID Int
+  bonusSetup        BonusSetup?       @relation(fields: [bonusSetupID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee  ManageEmployee?  @relation(fields: [employeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model Branches {
@@ -102,8 +114,7 @@ model Branches {
   manageEmployee               ManageEmployee[]
   manageHoliday                ManageHoliday[]
   monthlyPayGrade              MonthlyPayGrade[]
-  monthlyPayGradeAllowanceList MonthlyPayGradeAllowanceList[]
-  monthlyPayGradeDeductionList MonthlyPayGradeDeductionList[]
+ 
   publicHoliday                PublicHoliday[]
   salaryAllowance              SalaryAllowance[]
   salaryCycle                  SalaryCycle[]
@@ -122,6 +133,7 @@ model Company {
   timeZone                     String?                        @db.VarChar
   currency                     String?                        @db.VarChar
   pfNo                         String?                        @db.VarChar
+  panNo                       String?                        @db.VarChar
   tanNo                        String?                        @db.VarChar
   esiNo                        String?                        @db.VarChar
   linNo                        String?                        @db.VarChar
@@ -152,8 +164,7 @@ model Company {
   manageEmployee               ManageEmployee[]
   manageHoliday                ManageHoliday[]
   monthlyPayGrade              MonthlyPayGrade[]
-  monthlyPayGradeAllowanceList MonthlyPayGradeAllowanceList[]
-  monthlyPayGradeDeductionList MonthlyPayGradeDeductionList[]
+ 
   publicHoliday                PublicHoliday[]
   salaryAllowance              SalaryAllowance[]
   salaryCycle                  SalaryCycle[]
@@ -482,6 +493,7 @@ model ManageEmployee {
   serviceProvider         ServiceProvider?          @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   promotionRequest        PromotionRequest[]
   empPromotion            EmpPromotion[]
+  bonusAllocation         BonusAllocation[]
 }
 
 model EmpPromotion {
@@ -576,6 +588,7 @@ model MonthlyPayGrade {
   companyID                                                                    Int?
   branchesID                                                                   Int?
   monthlyPayGradeName                                                          String?                        @db.VarChar
+  salType                                                                    String?                        @db.VarChar
   grossSalary                                                                  String?                        @db.VarChar
   percentageOfBasic                                                            String?                        @db.VarChar
   basicSalary                                                                  Int?
@@ -592,30 +605,19 @@ model MonthlyPayGrade {
 
 model MonthlyPayGradeAllowanceList {
   id                Int              @id @default(autoincrement())
-  serviceProviderID Int?
-  companyID         Int?
-  branchesID        Int?
   monthlyPayGradeID Int?
   salaryallowanceID Int?
-  branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   monthlyPayGrade   MonthlyPayGrade? @relation(fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   salaryAllowance   SalaryAllowance? @relation(fields: [salaryallowanceID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model MonthlyPayGradeDeductionList {
   id                Int              @id @default(autoincrement())
-  serviceProviderID Int?
-  companyID         Int?
-  branchesID        Int?
-  monthlyPayGradeID Int?
+
   salaryDeductionID Int?
-  branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  monthlyPayGradeID Int?
   monthlyPayGrade   MonthlyPayGrade? @relation(fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   salaryDeduction   SalaryDeduction? @relation(fields: [salaryDeductionID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model PublicHoliday {
@@ -707,8 +709,6 @@ model ServiceProvider {
   manageEmployee               ManageEmployee[]
   manageHoliday                ManageHoliday[]
   monthlyPayGrade              MonthlyPayGrade[]
-  monthlyPayGradeAllowanceList MonthlyPayGradeAllowanceList[]
-  monthlyPayGradeDeductionList MonthlyPayGradeDeductionList[]
   publicHoliday                PublicHoliday[]
   salaryAllowance              SalaryAllowance[]
   salaryCycle                  SalaryCycle[]

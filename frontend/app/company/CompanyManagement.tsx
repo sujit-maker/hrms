@@ -121,77 +121,84 @@ export function CompanyManagement() {
     }
   }, [formData.companyName])
 
- 
-// add once near your helpers/constants
-const UPLOAD_URL = "http://localhost:8000/files/upload";
 
-async function uploadImage(file: File): Promise<string> {
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch(UPLOAD_URL, { method: "POST", body: fd });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  const raw = await res.json();
-  // try common shapes: {url}, {data:{url}}, {location}
-  return raw?.url || raw?.data?.url || raw?.location || "";
-}
+  // add once near your helpers/constants
+  const UPLOAD_URL = "http://localhost:8000/files/upload";
+
+  async function uploadImage(file: File): Promise<string> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(UPLOAD_URL, { method: "POST", body: fd });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const raw = await res.json();
+    // try common shapes: {url}, {data:{url}}, {location}
+    return raw?.url || raw?.data?.url || raw?.location || "";
+  }
 
   // Submit form
-// Submit form
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  // Submit form
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  try {
-    // 1) upload files first (if provided)
-    let companyLogoUrl = formData.companyLogoUrl || "";
-    let SignatureUrl = formData.SignatureUrl || "";
+    try {
+      // 1) upload files first (if provided)
+      let companyLogoUrl = formData.companyLogoUrl || "";
+      let SignatureUrl = formData.SignatureUrl || "";
 
-    if (logoFile) {
-      companyLogoUrl = await uploadImage(logoFile);
-    }
-    if (signatureFile) {
-      SignatureUrl = await uploadImage(signatureFile);
-    }
+      if (logoFile) {
+        companyLogoUrl = await uploadImage(logoFile);
+      }
+      if (signatureFile) {
+        SignatureUrl = await uploadImage(signatureFile);
+      }
 
-    // 2) choose companyName: manual first, autocomplete fallback
-    const finalData = {
-      ...formData,
-      companyName: formData.companyName || formData.autocompleteName || "",
-      companyLogoUrl: companyLogoUrl || undefined,
-      SignatureUrl: SignatureUrl || undefined,
-    };
+      // 2) choose companyName: manual first, autocomplete fallback
+      const finalData = {
+  ...formData,
+  companyName: formData.companyName || formData.autocompleteName || "",
+  serviceProviderID: formData.serviceProviderID || undefined,
+  companyLogoUrl: companyLogoUrl || undefined,
+  SignatureUrl: SignatureUrl || undefined,
+};
 
-    // 3) send JSON payload to your API
-    const res = editingCompany
-      ? await fetch(`http://localhost:8000/company/${editingCompany.id}`, {
+
+      // 3) send JSON payload to your API
+      const res = editingCompany
+        ? await fetch(`http://localhost:8000/company/${editingCompany.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(finalData),
         })
-      : await fetch("http://localhost:8000/company", {
+        : await fetch("http://localhost:8000/company", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(finalData),
         });
 
-    if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await res.text());
 
-    await fetchCompanies();
-    resetForm();
-    setIsDialogOpen(false);
-  } catch (err) {
-    console.error(err);
-    // optionally surface to UI:
-    // setError(err instanceof Error ? err.message : "Save failed");
-  }
-};
+      await fetchCompanies();
+      resetForm();
+      setIsDialogOpen(false);
+    } catch (err) {
+      console.error(err);
+      // optionally surface to UI:
+      // setError(err instanceof Error ? err.message : "Save failed");
+    }
+  };
 
 
 
-  const handleEdit = (company: Company) => {
-    setFormData(company)
-    setEditingCompany(company)
-    setIsDialogOpen(true)
-  }
+  const handleEdit = (company: Company & { serviceProvider?: ServiceProvider }) => {
+  setFormData({
+    ...company,
+    serviceProviderID: company.serviceProviderID,
+    autocompleteName: company.serviceProvider?.companyName || "",
+  })
+  setEditingCompany(company)
+  setIsDialogOpen(true)
+}
+
 
   const handleView = (company: Company) => {
     setViewCompany(company)
@@ -274,51 +281,51 @@ const handleSubmit = async (e: React.FormEvent) => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Company Name with Service Provider Autocomplete */}
-             <div ref={wrapperRef} className="space-y-2 relative">
-  <Label>Service Provider *</Label>
-  <Input
-    value={formData.autocompleteName || ""} // separate state for autocomplete input
-    onChange={(e) => {
-      const val = e.target.value
-      setFormData((p) => ({ ...p, autocompleteName: val }))
-      if (val.length > 1) fetchServiceProviders(val)
-      else setServiceProviders([])
-    }}
-    placeholder="Start typing service provider..."
-    autoComplete="off"
-  />
-  {serviceProviders.length > 0 && (
-    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-40 overflow-y-auto">
-      {serviceProviders.map((sp) => (
-        <div
-          key={sp.id}
-          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-          onMouseDown={(e) => e.preventDefault()} // prevent blur
-          onClick={() => {
-            // On single click, set serviceProviderID and autocompleteName
-            setFormData((p) => ({
-              ...p,
-              serviceProviderID: sp.id,
-              autocompleteName: sp.companyName,
-            }))
-            setServiceProviders([])
-          }}
-        >
-          {sp.companyName}
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+              <div ref={wrapperRef} className="space-y-2 relative">
+                <Label>Service Provider *</Label>
+                <Input
+                  value={formData.autocompleteName || ""} // separate state for autocomplete input
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setFormData((p) => ({ ...p, autocompleteName: val }))
+                    if (val.length > 1) fetchServiceProviders(val)
+                    else setServiceProviders([])
+                  }}
+                  placeholder="Start typing service provider..."
+                  autoComplete="off"
+                />
+                {serviceProviders.length > 0 && (
+                  <div className="absolute z-10 bg-white border rounded w-full shadow max-h-40 overflow-y-auto">
+                    {serviceProviders.map((sp) => (
+                      <div
+                        key={sp.id}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                        onMouseDown={(e) => e.preventDefault()} // prevent blur
+                        onClick={() => {
+                          // On single click, set serviceProviderID and autocompleteName
+                          setFormData((p) => ({
+                            ...p,
+                            serviceProviderID: sp.id,
+                            autocompleteName: sp.companyName,
+                          }))
+                          setServiceProviders([])
+                        }}
+                      >
+                        {sp.companyName}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-<div className="space-y-2">
-  <Label>Company Name (Manual / Override)</Label>
-  <Input
-    value={formData.companyName || ""}
-    onChange={(e) => setFormData((p) => ({ ...p, companyName: e.target.value }))}
-    placeholder="Enter company name manually"
-  />
-</div>
+              <div className="space-y-2">
+                <Label>Company Name (Manual / Override)</Label>
+                <Input
+                  value={formData.companyName || ""}
+                  onChange={(e) => setFormData((p) => ({ ...p, companyName: e.target.value }))}
+                  placeholder="Enter company name manually"
+                />
+              </div>
 
 
               {/* Rest of the form */}
@@ -369,8 +376,19 @@ const handleSubmit = async (e: React.FormEvent) => {
 
               <div className="space-y-2">
                 <Label>Financial Year Start</Label>
-                <Input value={formData.financialYearStart || ""} onChange={(e) => setFormData((p) => ({ ...p, financialYearStart: e.target.value }))} />
+                <select
+                  className="w-full rounded-md border px-3 py-2"
+                  value={formData.financialYearStart || ""}
+                  onChange={(e) =>
+                    setFormData((p) => ({ ...p, financialYearStart: e.target.value }))
+                  }
+                >
+                  <option value="">-- Select Start Date --</option>
+                  <option value="1st Jan">1st Jan</option>
+                  <option value="1st April">1st April</option>
+                </select>
               </div>
+
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -423,7 +441,7 @@ const handleSubmit = async (e: React.FormEvent) => {
               <p><strong>TimeZone:</strong> {viewCompany.timeZone}</p>
               <p><strong>PF:</strong> {viewCompany.pfNo}</p>
               <p><strong>TAN:</strong> {viewCompany.tanNo}</p>
-              <p><strong>PAN:</strong> {viewCompany.panNo}</p>
+           <p><strong>PAN:</strong> {viewCompany.panNo}</p>
               <p><strong>ESI:</strong> {viewCompany.esiNo}</p>
               <p><strong>LIN:</strong> {viewCompany.linNo}</p>
               <p><strong>Shop Reg:</strong> {viewCompany.shopRegNo}</p>

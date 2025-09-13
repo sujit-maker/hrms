@@ -105,8 +105,8 @@ interface CurrentPos {
   designations?: { id: ID; designantion?: string | null } | null;
 }
 
-// Promotion request row (PromotionRequest)
-interface PromotionReq {
+// Promotion request row (empPromotionuest)
+interface empPromotion {
   id: ID;
   manageEmployeeID?: ID | null;
   empID?: string | null;
@@ -132,10 +132,10 @@ interface PromotionReq {
   created_at?: string | null;
 
   // Optional nested names if included by your API
-  departments_promotionRequest_currentDepartmentIDTodepartments?: { id: ID; departmentName?: string | null } | null;
-  designations_promotionRequest_currentDesignationIDTodesignations?: { id: ID; designantion?: string | null } | null;
-  departments_promotionRequest_proposedDepartmentIDTodepartments?: { id: ID; departmentName?: string | null } | null;
-  designations_promotionRequest_proposedDesignationIDTodesignations?: { id: ID; designantion?: string | null } | null;
+  departments_empPromotionuest_currentDepartmentIDTodepartments?: { id: ID; departmentName?: string | null } | null;
+  designations_empPromotionuest_currentDesignationIDTodesignations?: { id: ID; designantion?: string | null } | null;
+  departments_empPromotionuest_proposedDepartmentIDTodepartments?: { id: ID; departmentName?: string | null } | null;
+  designations_empPromotionuest_proposedDesignationIDTodesignations?: { id: ID; designantion?: string | null } | null;
 }
 
 /** ========= API endpoints ========= */
@@ -162,7 +162,6 @@ const API = {
   hourlyGrades:  "http://localhost:8000/hourly-grade",
 
   empCurrent: "http://localhost:8000/emp-current-position",
-  promotionReq: "http://localhost:8000/promotion-request",
   departments: "http://localhost:8000/departments",
   designations: "http://localhost:8000/designations",
 };
@@ -184,7 +183,7 @@ async function fetchJSONSafe<T>(url: string, signal?: AbortSignal): Promise<T> {
 /** ========= Component ========= */
 export function EmployeesPromotionsManagement() {
   /** ========== table data (show list of promotion requests) ========== */
-  const [rows, setRows] = useState<PromotionReq[]>([]);
+const [rows, setRows] = useState<EmpPromotionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -193,8 +192,8 @@ export function EmployeesPromotionsManagement() {
   /** dialog state */
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
-  const [viewRow, setViewRow] = useState<PromotionReq | null>(null);
-  const [editingRow, setEditingRow] = useState<{ current?: CurrentPos | null; promo?: PromotionReq | null } | null>(null);
+  const [viewRow, setViewRow] = useState<empPromotion | null>(null);
+  const [editingRow, setEditingRow] = useState<{ current?: CurrentPos | null; promo?: empPromotion | null } | null>(null);
 
   /** ========== autocomplete refs & state ========== */
   const spRef = useRef<HTMLDivElement>(null);
@@ -229,6 +228,7 @@ const managerRef = useRef<HTMLDivElement>(null);
   const [deptPropList, setDeptPropList] = useState<Dept[]>([]);
   const [desgPropList, setDesgPropList] = useState<Desg[]>([]);
   const [managerList, setManagerList] = useState<any[]>([]);
+
 
   const [spLoading, setSpLoading] = useState(false);
   const [coLoading, setCoLoading] = useState(false);
@@ -469,19 +469,61 @@ managerAutocomplete: string;
     },
   });
 
+  // New: row shape for GET /emp-promotion
+interface EmpPromotionRow {
+  id: ID;
+  manageEmployeeID: ID | null;
+
+  departmentNameID: ID | null;
+  designationID: ID | null;
+  managerID: ID | null;
+
+  employmentType: string | null;   // e.g. "Contract"
+  employmentStatus: string | null; // e.g. "Probation"
+  probationPeriod: string | null;
+
+  workShiftID: ID | null;
+  attendancePolicyID: ID | null;
+  leavePolicyID: ID | null;
+
+  salaryPayGradeType: string | null; // "Hourly" | "Monthly" | null
+  monthlyPayGradeID: ID | null;
+  hourlyPayGradeID: ID | null;
+
+  // nested names (as returned in your sample)
+  departments?: { id: ID; departmentName?: string | null } | null;
+  designations?: { id: ID; designantion?: string | null } | null;
+  workShift?: any | null;
+  attendancePolicy?: any | null;
+  leavePolicy?: any | null;
+  hourlyPayGrade?: any | null;
+  monthlyPayGrade?: any | null;
+
+  // nested employee for display
+  manageEmployee?: {
+    id: ID;
+    employeeID?: string | null;
+    employeeFirstName?: string | null;
+    employeeLastName?: string | null;
+    employeePhotoUrl?: string | null;
+  } | null;
+}
+
+
   /** ======= load list ======= */
-  const fetchRows = async () => {
-    try {
-      setLoading(true);
-      const data = await fetchJSONSafe<PromotionReq[]>(API.promotionReq);
-      setRows(data ?? []);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load");
-    } finally {
-      setLoading(false);
-    }
-  };
-  useEffect(() => { fetchRows(); }, []);
+const fetchRows = async () => {
+  try {
+    setLoading(true);
+    const data = await fetchJSONSafe<EmpPromotionRow[]>(API.empPromotion); // ✅ correct type + endpoint
+    setRows(Array.isArray(data) ? data : (data ?? []));
+  } catch (e: any) {
+    setError(e?.message || "Failed to load");
+  } finally {
+    setLoading(false);
+  }
+};
+useEffect(() => { fetchRows(); }, []);
+
 
   /** ======= debounced suggestion runners (SP/CO/BR/EMP/DEPT/DESG) ======= */
   const debouncedFetch = <T,>(conf: {
@@ -706,16 +748,21 @@ const runFetchHourlyPG = (q: string) =>
 
 
   const filteredRows = useMemo(() => {
-    const t = searchTerm.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((r) => {
-      const name = r.empID ?? "";
-      const status = r.status ?? "";
-      return [name, status, String(r.newDepartmentID ?? ""), String(r.proposedDepartmentID ?? "")]
-        .map((x) => (x ?? "").toLowerCase())
-        .some((f) => f.includes(t));
-    });
-  }, [rows, searchTerm]);
+  const t = searchTerm.trim().toLowerCase();
+  if (!t) return rows;
+  return rows.filter((r) => {
+    const empName = `${r.manageEmployee?.employeeFirstName ?? ""} ${r.manageEmployee?.employeeLastName ?? ""}`.toLowerCase();
+    const empId   = (r.manageEmployee?.employeeID ?? "").toLowerCase();
+    const dept    = (r.departments?.departmentName ?? "").toLowerCase();
+    const desg    = (r.designations?.designantion ?? "").toLowerCase();
+    const etype   = (r.employmentType ?? "").toLowerCase();
+    const estatus = (r.employmentStatus ?? "").toLowerCase();
+    const ptype   = (r.salaryPayGradeType ?? "").toLowerCase();
+    return [empName, empId, dept, desg, etype, estatus, ptype].some((x) => x.includes(t));
+  });
+}, [rows, searchTerm]);
+
+
 
   /** ======= when employee selected, prefill “Current Position Information” ======= */
   const prefillFromEmployee = async (emp: EmpRow) => {
@@ -983,212 +1030,77 @@ const handleSubmit = async (e: React.FormEvent) => {
 };
 
 
-  /** ======= edit/view/delete ======= */
-/** ======= edit/view/delete ======= */
-const handleEdit = async (promo: PromotionReq) => {
+ 
+const handleEdit = async (row: EmpPromotionRow) => {
+  // Keep your existing "current" + "manage-emp" prefill logic
   let current: CurrentPos | null = null;
-
-  // 1) Load latest current-position row for this employee (kept from your logic)
-  if (promo.manageEmployeeID) {
+  if (row.manageEmployeeID) {
     try {
       const list = await fetchJSONSafe<CurrentPos[]>(
-        `${API.empCurrent}?manageEmployeeID=${promo.manageEmployeeID}&take=1&skip=0`
+        `${API.empCurrent}?manageEmployeeID=${row.manageEmployeeID}&take=1&skip=0`
       );
       current = list?.[0] ?? null;
-    } catch (_) {}
+    } catch {}
   }
 
-  setEditingRow({ current, promo });
+  setEditingRow({ current, promo: row });
 
-  // 2) Fetch the employee and prefill everything (names + current data + latest promotion snapshot)
-  try {
-    if (!promo.manageEmployeeID) {
-      setIsDialogOpen(true);
-      return;
-    }
-
-    const emp = await fetchJSONSafe<EmpRow>(`${API.manageEmp}/${promo.manageEmployeeID}`);
-
-    // Reuse your helper so current Dept/Desg/Manager/Paygrade/Types get set
+  // Reuse prefillFromEmployee to hydrate names + current values
+  if (row.manageEmployeeID) {
+    const emp = await fetchJSONSafe<EmpRow>(`${API.manageEmp}/${row.manageEmployeeID}`);
     await prefillFromEmployee(emp);
+  }
 
-    // Pick the latest EmpPromotion row from /manage-emp payload (for stable IDs)
-    const latest =
-      emp.empPromotion && emp.empPromotion.length
-        ? [...emp.empPromotion].sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0]
-        : null;
-
-    const promotionObj: PromotionForm = latest
-      ? {
-          id: latest.id,
-          manageEmployeeID: latest.manageEmployeeID ?? emp.id ?? null,
-          departmentNameID: latest.departmentNameID ?? null,
-          designationID: latest.designationID ?? null,
-          managerID: latest.managerID ?? null,
-          employmentType: latest.employmentType ?? "",
-          employmentStatus: latest.employmentStatus ?? "",
-          probationPeriod: latest.probationPeriod ?? "",
-          workShiftID: latest.workShiftID ?? null,
-          attendancePolicyID: latest.attendancePolicyID ?? null,
-          leavePolicyID: latest.leavePolicyID ?? null,
-          salaryPayGradeType: latest.salaryPayGradeType ?? "",
-          monthlyPayGradeID: latest.monthlyPayGradeID ?? null,
-          hourlyPayGradeID: latest.hourlyPayGradeID ?? null,
-        }
-      : {
-          id: undefined,
-          manageEmployeeID: emp.id ?? null,
-          departmentNameID: null,
-          designationID: null,
-          managerID: null,
-          employmentType: "",
-          employmentStatus: "",
-          probationPeriod: "",
-          workShiftID: null,
-          attendancePolicyID: null,
-          leavePolicyID: null,
-          salaryPayGradeType: "",
-          monthlyPayGradeID: null,
-          hourlyPayGradeID: null,
-        };
-
-    // Prime identity + promotion + simple ID displays
-    setFormData((p) => ({
-      ...p,
-      manageEmployeeID: emp.id,
-      empAutocomplete: `${emp.employeeFirstName ?? ""} ${emp.employeeLastName ?? ""} - ${emp.employeeID ?? ""}`.trim(),
-      empID: emp.employeeID ?? "",
-      serviceProviderID: emp.serviceProviderID ?? p.serviceProviderID,
-      companyID: emp.companyID ?? p.companyID,
-      branchesID: emp.branchesID ?? p.branchesID,
-
-      promotion: promotionObj,
-
-      currentDeptIdDisplay: promotionObj.departmentNameID != null ? String(promotionObj.departmentNameID) : "",
-      currentDesgIdDisplay: promotionObj.designationID != null ? String(promotionObj.designationID) : "",
-      currentManagerIdDisplay: promotionObj.managerID != null ? String(promotionObj.managerID) : "",
-      currentDeptNameDisplay: "",
-      currentDesgNameDisplay: "",
-      currentManagerNameDisplay: "",
-      currentSalaryPayGradeTypeDisplay: promotionObj.salaryPayGradeType,
-      currentEmploymentTypeDisplay: promotionObj.employmentType,
-      currentEmploymentStatusDisplay: promotionObj.employmentStatus,
-    }));
-
-    // Resolve human-friendly labels for all pickers
-    try {
-      const [
-        deptRes,
-        desgRes,
-        ws,
-        ap,
-        lp,
-        mpg,
-        hpg,
-        mgrEmp,
-      ] = await Promise.all([
-        promotionObj.departmentNameID ? fetchJSONSafe<any>(`${API.departments}/${promotionObj.departmentNameID}`) : null,
-        promotionObj.designationID   ? fetchJSONSafe<any>(`${API.designations}/${promotionObj.designationID}`) : null,
-        promotionObj.workShiftID     ? fetchJSONSafe<any>(`${API.workShifts}/${promotionObj.workShiftID}`) : null,
-        promotionObj.attendancePolicyID ? fetchJSONSafe<any>(`${API.attendancePolicies}/${promotionObj.attendancePolicyID}`) : null,
-        promotionObj.leavePolicyID   ? fetchJSONSafe<any>(`${API.leavePolicies}/${promotionObj.leavePolicyID}`) : null,
-        promotionObj.monthlyPayGradeID ? fetchJSONSafe<any>(`${API.monthlyGrades}/${promotionObj.monthlyPayGradeID}`) : null,
-        promotionObj.hourlyPayGradeID  ? fetchJSONSafe<any>(`${API.hourlyGrades}/${promotionObj.hourlyPayGradeID}`) : null,
-        promotionObj.managerID       ? fetchJSONSafe<any>(`${API.manageEmp}/${promotionObj.managerID}`) : null,
-      ]);
-
-      const mgrFull = mgrEmp ? `${mgrEmp.employeeFirstName ?? ""} ${mgrEmp.employeeLastName ?? ""}`.trim() : "";
-
-      setFormData((p) => ({
-        ...p,
-        currentDeptNameDisplay: deptRes?.departmentName?.trim() || p.currentDeptNameDisplay,
-        currentDesgNameDisplay: desgRes?.designantion?.trim() || p.currentDesgNameDisplay,
-        currentManagerNameDisplay: mgrFull || p.currentManagerNameDisplay,
-
-        // keep edit autocompletes in sync
-        deptCurrAutocomplete: deptRes?.departmentName?.trim() || p.deptCurrAutocomplete,
-        desgCurrAutocomplete: desgRes?.designantion?.trim() || p.desgCurrAutocomplete,
-
-        // newly added autocompletes
-        workShiftAutocomplete: ws?.workShiftName ?? p.workShiftAutocomplete,
-        attPolicyAutocomplete: ap?.policyName ?? p.attPolicyAutocomplete,
-        leavePolicyAutocomplete: lp?.policyName ?? p.leavePolicyAutocomplete,
-        monthlyPGAutocomplete: mpg?.monthlyPayGradeName ?? p.monthlyPGAutocomplete,
-        hourlyPGAutocomplete: hpg?.hourlyPayGradeName ?? p.hourlyPGAutocomplete,
-        managerAutocomplete: mgrFull || (mgrEmp?.employeeID ?? p.managerAutocomplete),
-      }));
-    } catch (e) {
-      console.warn("Could not resolve labels for dept/desg/manager/paygrades:", e);
-    }
-  } catch (_) {}
-
-  // 3) Keep your original "second setFormData" block to carry over everything else
+  // Seed the form’s "promotion" block from this row
   setFormData((p) => ({
     ...p,
-    serviceProviderID: current?.serviceProviderID ?? p.serviceProviderID,
-    companyID: current?.companyID ?? p.companyID,
-    branchesID: current?.branchesID ?? p.branchesID,
-    spAutocomplete: current?.serviceProvider?.companyName ?? p.spAutocomplete,
-    coAutocomplete: current?.company?.companyName ?? p.coAutocomplete,
-    brAutocomplete: current?.branches?.branchName ?? p.brAutocomplete,
-
-    // new/proposed + identity
-    manageEmployeeID: promo.manageEmployeeID ?? null,
-    empAutocomplete: promo.empID ? promo.empID : p.empAutocomplete,
-    empID: promo.empID ?? "",
-
-    existingDepartmentID: current?.existingDepartmentID ?? p.existingDepartmentID,
-    existingDesignationID: current?.existingDesignationID ?? p.existingDesignationID,
-    existingMonthlyPayGradeID: current?.existingMonthlyPayGradeID ?? p.existingMonthlyPayGradeID,
-    existingHourlyPayGradeID: current?.existingHourlyPayGradeID ?? p.existingHourlyPayGradeID,
-    existingSalaryCtc: current?.existingSalaryCtc != null ? String(current.existingSalaryCtc) : p.existingSalaryCtc,
-    existingEmploymentType:
-      current?.existingEmploymentType != null ? String(current.existingEmploymentType) : p.existingEmploymentType,
-    effectiveFrom: current?.effectiveFrom ?? p.effectiveFrom,
-    effectiveTo: current?.effectiveTo ?? p.effectiveTo,
-
-    deptCurrAutocomplete: current?.departments?.departmentName ?? p.deptCurrAutocomplete,
-    desgCurrAutocomplete: current?.designations?.designantion ?? p.desgCurrAutocomplete,
-
-    newDepartmentID: promo.newDepartmentID ?? p.newDepartmentID,
-    newDesignationID: promo.newDesignationID ?? p.newDesignationID,
-    newMonthlyPayGradeID: promo.newMonthlyPayGradeID ?? p.newMonthlyPayGradeID,
-    newHourlyPayGradeID: promo.newHourlyPayGradeID ?? p.newHourlyPayGradeID,
-    newSalaryCtc: promo.newSalaryCtc != null ? String(promo.newSalaryCtc) : p.newSalaryCtc,
-    newEmploymentType: promo.newEmploymentType != null ? String(promo.newEmploymentType) : p.newEmploymentType,
-
-    proposedDepartmentID: promo.proposedDepartmentID ?? p.proposedDepartmentID,
-    proposedDesignationID: promo.proposedDesignationID ?? p.proposedDesignationID,
-    proposedMonthlyPayGradeID: promo.proposedMonthlyPayGradeID ?? p.proposedMonthlyPayGradeID,
-    proposedHourlyPayGradeID: promo.proposedHourlyPayGradeID ?? p.proposedHourlyPayGradeID,
-    proposedSalaryCtc: promo.proposedSalaryCtc != null ? String(promo.proposedSalaryCtc) : p.proposedSalaryCtc,
-    proposedEmploymentType:
-      promo.proposedEmploymentType != null ? String(promo.proposedEmploymentType) : p.proposedEmploymentType,
-
-    description: promo.description ?? p.description,
-    promotionDate: promo.promotionDate ?? p.promotionDate,
-    status: promo.status ?? p.status,
+    manageEmployeeID: row.manageEmployeeID ?? null,
+    empAutocomplete: [
+      row.manageEmployee?.employeeFirstName ?? "",
+      row.manageEmployee?.employeeLastName ?? "",
+      row.manageEmployee?.employeeID ? `- ${row.manageEmployee?.employeeID}` : ""
+    ].join(" ").replace(/\s+/g, " ").trim(),
+    promotion: {
+      id: row.id,
+      manageEmployeeID: row.manageEmployeeID ?? null,
+      departmentNameID: row.departmentNameID ?? null,
+      designationID: row.designationID ?? null,
+      managerID: row.managerID ?? null,
+      employmentType: row.employmentType ?? "",
+      employmentStatus: row.employmentStatus ?? "",
+      probationPeriod: row.probationPeriod ?? "",
+      workShiftID: row.workShiftID ?? null,
+      attendancePolicyID: row.attendancePolicyID ?? null,
+      leavePolicyID: row.leavePolicyID ?? null,
+      salaryPayGradeType: row.salaryPayGradeType ?? "",
+      monthlyPayGradeID: row.monthlyPayGradeID ?? null,
+      hourlyPayGradeID: row.hourlyPayGradeID ?? null,
+    },
+    // instant display names
+    currentDeptNameDisplay: row.departments?.departmentName ?? p.currentDeptNameDisplay,
+    currentDesgNameDisplay: row.designations?.designantion ?? p.currentDesgNameDisplay,
   }));
 
   setIsDialogOpen(true);
 };
 
 
-  const handleView = (promo: PromotionReq) => {
-    setViewRow(promo);
-    setIsViewOpen(true);
-  };
 
-  const handleDelete = async (id: ID) => {
-    if (!confirm("Delete this promotion request?")) return;
-    try {
-      const res = await fetch(`${API.promotionReq}/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
-      await fetchRows();
-    } catch (e: any) {
-      alert(e?.message || "Delete failed");
-    }
-  };
+  // was: const handleView = (promo: PromotionReq) => {
+const handleView = (promo: EmpPromotionRow) => {
+  setViewRow(promo as any); // if your view modal expects old shape, read from nested fields defensively
+  setIsViewOpen(true);
+};
+
+
+ // was: const handleDelete = async (id: ID) => { fetch(`${API.promotionReq}/${id}`, ... }
+const handleDelete = async (id: ID) => {
+  if (!confirm("Delete this promotion?")) return;
+  const res = await fetch(`${API.empPromotion}/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+  await fetchRows();
+};
+
 
   /** ======= Reset ======= */
   const resetForm = () => {
@@ -2216,76 +2128,81 @@ managerAutocomplete: "",
                   <TableHead className="w-[100px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <Icon icon="mdi:trending-up" className="w-12 h-12 text-gray-300" />
-                        <p>No promotion requests found</p>
-                        <p className="text-sm">Try adjusting your search criteria</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRows.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="whitespace-nowrap">
-                        <Badge variant={r.status === "Applied" ? "default" : "secondary"}>{r.status ?? "—"}</Badge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">{r.empID ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.newDepartmentID ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.newDesignationID ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.proposedDepartmentID ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.proposedDesignationID ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.promotionDate ?? "—"}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          {r.status !== "Applied" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={async () => {
-                                // quick set to Applied
-                                try {
-                                  const res = await fetch(`${API.promotionReq}/${r.id}`, {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ status: "Applied" }),
-                                  });
-                                  if (!res.ok) throw new Error(await res.text());
-                                  await fetchRows();
-                                } catch (e: any) {
-                                  alert(e?.message || "Failed to apply");
-                                }
-                              }}
-                              className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                              title="Mark as Applied"
-                            >
-                              <CheckCircle className="w-3 h-3" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="sm" onClick={() => handleView(r)} className="h-7 w-7 p-0" title="View">
-                            <Eye className="w-3 h-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(r)} className="h-7 w-7 p-0" title="Edit">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(r.id)}
-                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
+        <TableBody>
+  {filteredRows.length === 0 && !loading && (
+    <TableRow>
+      {/* 8 columns in header => colSpan=8 */}
+      <TableCell colSpan={8} className="text-center text-sm text-gray-500">
+        No records
+      </TableCell>
+    </TableRow>
+  )}
+
+  {filteredRows.map((r) => {
+    const empId   = r.manageEmployee?.employeeID ?? "—";
+    const empName = `${r.manageEmployee?.employeeFirstName ?? ""} ${r.manageEmployee?.employeeLastName ?? ""}`.trim();
+
+    const newDept = r.departments?.departmentName?.trim() ?? "—";
+    const newDesg = r.designations?.designantion?.trim() ?? "—";
+
+    // Proposed fields don't exist in /emp-promotion; show placeholders
+    const proposedDept = "—";
+    const proposedDesg = "—";
+
+    // /emp-promotion has no official date; try promotionDate if present, else createdAt, else —
+    const promoDate =
+      (r as any)?.promotionDate
+        ? new Date((r as any).promotionDate).toLocaleDateString()
+        : (r as any)?.createdAt
+          ? new Date((r as any).createdAt).toLocaleDateString()
+          : "—";
+
+    return (
+      <TableRow key={r.id}>
+        {/* Status */}
+        <TableCell className="whitespace-nowrap">
+          {r.employmentStatus ?? "—"}
+        </TableCell>
+
+        {/* Employee ID */}
+        <TableCell className="whitespace-nowrap">
+          <div className="font-medium">{empId}</div>
+          <div className="text-xs text-gray-500">{empName || "\u00A0"}</div>
+        </TableCell>
+
+        {/* New Dept */}
+        <TableCell className="whitespace-nowrap">{newDept}</TableCell>
+
+        {/* New Desg */}
+        <TableCell className="whitespace-nowrap">{newDesg}</TableCell>
+
+        {/* Proposed Dept (placeholder) */}
+        <TableCell className="whitespace-nowrap">{proposedDept}</TableCell>
+
+        {/* Proposed Desg (placeholder) */}
+        <TableCell className="whitespace-nowrap">{proposedDesg}</TableCell>
+
+        {/* Promotion Date */}
+        <TableCell className="whitespace-nowrap">{promoDate}</TableCell>
+
+        {/* Actions */}
+        <TableCell className="text-right space-x-2">
+          <Button variant="ghost" size="icon" onClick={() => handleView(r)} title="View">
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => handleEdit(r)} title="Edit">
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)} title="Delete">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TableCell>
+      </TableRow>
+    );
+  })}
+</TableBody>
+
+
             </Table>
           </div>
         </CardContent>

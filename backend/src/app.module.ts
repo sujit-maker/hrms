@@ -10,7 +10,6 @@ import { DepartmentsModule } from './departments/departments.module';
 import { DesignationsModule } from './designations/designations.module';
 import { BankDetailsModule } from './bank-details/bank-details.module';
 import { ContractorsModule } from './contractors/contractors.module';
-import { WorkShiftModule } from './work-shift/work-shift.module';
 import { AttendancePolicyModule } from './attendance-policy/attendance-policy.module';
 import { LeavePolicyModule } from './leave-policy/leave-policy.module';
 import { ManageHolidayModule } from './manage-holiday/manage-holiday.module';
@@ -25,6 +24,13 @@ import { PromotionRequestModule } from './promotion-request/promotion-request.mo
 import { EmpPromotionModule } from './emp-promotion/emp-promotion.module';
 import { EmpFieldSiteAttendanceModule } from './emp-field-site-attendance/emp-field-site-attendance.module';
 import { EmpAttendanceRegulariseModule } from './emp-attendance-regularise/emp-attendance-regularise.module';
+import { SalaryCycleModule } from './salary-cycle/salary-cycle.module';
+import { SalaryAllowanceModule } from './salary-allowance/salary-allowance.module';
+import { SalaryDeductionModule } from './salary-deduction/salary-deduction.module';
+import { MonthlyPayGradeModule } from './monthly-pay-grade/monthly-pay-grade.module';
+import { HourlyGradeModule } from './hourly-grade/hourly-grade.module';
+import { BonusSetupModule } from './bonus-setup/bonus-setup.module';
+import { BonousAllocationModule } from './bonous-allocation/bonous-allocation.module';
 
 @Module({
   imports: [
@@ -41,7 +47,6 @@ import { EmpAttendanceRegulariseModule } from './emp-attendance-regularise/emp-a
     DesignationsModule,
     BankDetailsModule,
     ContractorsModule,
-    WorkShiftModule,
     AttendancePolicyModule,
     LeavePolicyModule,
     ManageHolidayModule,
@@ -56,6 +61,13 @@ import { EmpAttendanceRegulariseModule } from './emp-attendance-regularise/emp-a
     EmpPromotionModule,
     EmpFieldSiteAttendanceModule,
     EmpAttendanceRegulariseModule,
+    SalaryCycleModule,
+    SalaryAllowanceModule,
+    SalaryDeductionModule,
+    MonthlyPayGradeModule,
+    HourlyGradeModule,
+    BonusSetupModule,
+    BonousAllocationModule,
   ],
 })
 export class AppModule {}
