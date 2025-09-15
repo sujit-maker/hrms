@@ -44,4 +44,8 @@ export class CreateLeaveApplicationDto {
   @IsOptional()
   @IsString()
   purpose?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

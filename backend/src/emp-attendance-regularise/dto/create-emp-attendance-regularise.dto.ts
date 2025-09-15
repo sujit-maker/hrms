@@ -32,4 +32,8 @@ export class CreateEmpAttendanceRegulariseDto {
   @IsOptional()
   @IsString()
   remarks?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

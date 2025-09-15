@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, IsNumber } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsArray, ArrayNotEmpty, IsNumber } from 'class-validator';
 
 export class CreateLeavePolicyDto {
   @IsOptional()
@@ -32,4 +32,9 @@ export class CreateLeavePolicyDto {
   @IsOptional()
   @IsInt()
   earnLeaveCount?: number;
+
+  // ManageHoliday IDs selected in the UI; used to link via PublicHoliday
+  @IsOptional()
+  @IsArray()
+  applicableHolidayIds?: number[];
 }

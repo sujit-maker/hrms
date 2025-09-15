@@ -661,9 +661,13 @@ export function WorkShiftsManagement() {
                   </TableRow>
                 ) : (
                   filteredWorkShifts.map((workShift) => {
+                    // Calculate total weekly hours from the backend totalMinutes data
                     const totalWeeklyHours = workShift.weeklySchedule
                       .filter((day) => !day.isWeeklyOff)
-                      .reduce((sum, day) => sum + day.totalHours, 0);
+                      .reduce((sum, day) => {
+                        // Use the totalHours that was calculated from totalMinutes in loadWorkShifts
+                        return sum + day.totalHours;
+                      }, 0);
                     
                     const scheduleSummary = workShift.weeklySchedule
                       .filter((day) => !day.isWeeklyOff)

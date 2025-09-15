@@ -349,7 +349,7 @@ export function FieldAttendanceScheduleManagement() {
   }
 
   return (
-    <div className="space-y-6 w-full max-w-full mx-auto px-4 overflow-hidden">
+    <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
       {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="min-w-0 flex-1">
@@ -597,24 +597,24 @@ export function FieldAttendanceScheduleManagement() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="w-full table-fixed">
+            <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
-                  <TableHead className="w-[90px]">Service Provider</TableHead>
-                  <TableHead className="w-[80px]">Company Name</TableHead>
-                  <TableHead className="w-[80px]">Branch Name</TableHead>
-                  <TableHead className="w-[70px]">Employee ID</TableHead>
-                  <TableHead className="w-[100px]">Employee Name</TableHead>
-                  <TableHead className="w-[80px]">Site Name</TableHead>
-                  <TableHead className="w-[120px]">Address</TableHead>
-                  <TableHead className="w-[80px]">Latitude</TableHead>
-                  <TableHead className="w-[80px]">Longitude</TableHead>
-                  <TableHead className="w-[100px]">Google Maps Link</TableHead>
-                  <TableHead className="w-[80px]">From Date</TableHead>
-                  <TableHead className="w-[80px]">To Date</TableHead>
-                  <TableHead className="w-[80px]">Created</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  <TableHead className="w-[40px]">#</TableHead>
+                  <TableHead className="w-[80px]">Service Provider</TableHead>
+                  <TableHead className="w-[70px]">Company Name</TableHead>
+                  <TableHead className="w-[70px]">Branch Name</TableHead>
+                  <TableHead className="w-[60px]">Employee ID</TableHead>
+                  <TableHead className="w-[90px]">Employee Name</TableHead>
+                  <TableHead className="w-[70px]">Site Name</TableHead>
+                  <TableHead className="w-[100px]">Address</TableHead>
+                  <TableHead className="w-[70px]">Latitude</TableHead>
+                  <TableHead className="w-[70px]">Longitude</TableHead>
+                  <TableHead className="w-[90px]">Google Maps Link</TableHead>
+                  <TableHead className="w-[70px]">From Date</TableHead>
+                  <TableHead className="w-[70px]">To Date</TableHead>
+                  <TableHead className="w-[70px]">Created</TableHead>
+                  <TableHead className="w-[70px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

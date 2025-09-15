@@ -44,6 +44,14 @@ export class PublicHolidayService {
   }
 
   remove(id: number) {
-    return this.prisma.publicHoliday.delete({ where: { id } });
+    return this.prisma.$transaction(async (prisma) => {
+      // First delete all related leavePolicyHoliday records
+      await prisma.leavePolicyHoliday.deleteMany({
+        where: { publicHolidayID: id },
+      });
+      
+      // Then delete the PublicHoliday record
+      return prisma.publicHoliday.delete({ where: { id } });
+    });
   }
 }
