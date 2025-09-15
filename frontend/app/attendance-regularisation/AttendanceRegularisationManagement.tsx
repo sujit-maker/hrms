@@ -183,7 +183,7 @@ export function AttendanceRegularisationManagement() {
             ? new Date(regularisation.checkOutTime).toTimeString().split(' ')[0]
             : "",
           remarks: regularisation.remarks,
-          status: "Pending" as "Pending" | "Approved" | "Rejected",
+          status: (regularisation.status || "Pending") as "Pending" | "Approved" | "Rejected",
           createdAt: regularisation.createdAt
             ? new Date(regularisation.createdAt).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
@@ -332,28 +332,40 @@ export function AttendanceRegularisationManagement() {
     }
   }
 
-  const handleApprove = (id: string) => {
-    setRegularisations(prev => 
-      prev.map(regularisation => 
-        regularisation.id === id 
-          ? { ...regularisation, status: "Approved" as const }
-          : regularisation
-      )
-    )
+  const handleApprove = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/emp-attendance-regularise/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Approved" }),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to approve attendance regularisation: ${res.status}`)
+      }
+      await loadAttendanceRegularisations()
+    } catch (error) {
+      console.error("Error approving attendance regularisation:", error)
+    }
   }
 
-  const handleReject = (id: string) => {
-    setRegularisations(prev => 
-      prev.map(regularisation => 
-        regularisation.id === id 
-          ? { ...regularisation, status: "Rejected" as const }
-          : regularisation
-      )
-    )
+  const handleReject = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/emp-attendance-regularise/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Rejected" }),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to reject attendance regularisation: ${res.status}`)
+      }
+      await loadAttendanceRegularisations()
+    } catch (error) {
+      console.error("Error rejecting attendance regularisation:", error)
+    }
   }
 
   return (
-    <div className="space-y-6 w-full max-w-7xl mx-auto px-4">
+    <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
       {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="min-w-0 flex-1">
@@ -551,22 +563,22 @@ export function AttendanceRegularisationManagement() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1200px]">
+            <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[60px]">#</TableHead>
-                  <TableHead className="w-[120px]">Service Provider</TableHead>
-                  <TableHead className="w-[120px]">Company Name</TableHead>
-                  <TableHead className="w-[120px]">Branch Name</TableHead>
-                  <TableHead className="w-[100px]">Employee ID</TableHead>
-                  <TableHead className="w-[150px]">Employee Name</TableHead>
-                  <TableHead className="w-[120px]">Attendance Date</TableHead>
-                  <TableHead className="w-[120px]">Check-In Time</TableHead>
-                  <TableHead className="w-[120px]">Check-Out Time</TableHead>
-                  <TableHead className="w-[150px]">Remarks</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[100px]">Created</TableHead>
-                  <TableHead className="w-[120px] text-right">Actions</TableHead>
+                  <TableHead className="w-[50px]">#</TableHead>
+                  <TableHead className="w-[90px]">Service Provider</TableHead>
+                  <TableHead className="w-[80px]">Company Name</TableHead>
+                  <TableHead className="w-[80px]">Branch Name</TableHead>
+                  <TableHead className="w-[70px]">Employee ID</TableHead>
+                  <TableHead className="w-[100px]">Employee Name</TableHead>
+                  <TableHead className="w-[80px]">Attendance Date</TableHead>
+                  <TableHead className="w-[80px]">Check-In Time</TableHead>
+                  <TableHead className="w-[80px]">Check-Out Time</TableHead>
+                  <TableHead className="w-[80px]">Remarks</TableHead>
+                  <TableHead className="w-[70px]">Status</TableHead>
+                  <TableHead className="w-[80px]">Created</TableHead>
+                  <TableHead className="w-[80px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -583,16 +595,16 @@ export function AttendanceRegularisationManagement() {
                 ) : (
                   filteredRegularisations.map((regularisation, index) => (
                     <TableRow key={regularisation.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{index + 1}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.serviceProvider}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.branchName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.employeeId}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.employeeName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.attendanceDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.checkInTime}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.checkOutTime}</TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.remarks}</TableCell>
+                      <TableCell className="font-medium truncate">{index + 1}</TableCell>
+                      <TableCell className="truncate" title={regularisation.serviceProvider}>{regularisation.serviceProvider}</TableCell>
+                      <TableCell className="truncate" title={regularisation.companyName}>{regularisation.companyName}</TableCell>
+                      <TableCell className="truncate" title={regularisation.branchName}>{regularisation.branchName}</TableCell>
+                      <TableCell className="truncate">{regularisation.employeeId}</TableCell>
+                      <TableCell className="truncate" title={regularisation.employeeName}>{regularisation.employeeName}</TableCell>
+                      <TableCell className="truncate">{regularisation.attendanceDate}</TableCell>
+                      <TableCell className="truncate">{regularisation.checkInTime}</TableCell>
+                      <TableCell className="truncate">{regularisation.checkOutTime}</TableCell>
+                      <TableCell className="truncate" title={regularisation.remarks}>{regularisation.remarks}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         <Badge variant={
                           regularisation.status === "Approved" ? "default" : 
@@ -601,7 +613,7 @@ export function AttendanceRegularisationManagement() {
                           {regularisation.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{regularisation.createdAt}</TableCell>
+                      <TableCell className="truncate">{regularisation.createdAt}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
                           {regularisation.status === "Pending" && (

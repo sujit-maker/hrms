@@ -271,6 +271,7 @@ model EmpAttendanceRegularise {
   checkInTime       DateTime?        @db.Timestamp(6)
   checkOutTime      DateTime?        @db.Timestamp(6)
   remarks           String?          @db.VarChar
+  status            String?          @db.VarChar @default("Pending")
   branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -402,6 +403,7 @@ model leaveApplication {
   fromDate                DateTime?                 @db.Date
   toDate                  DateTime?                 @db.Date
   purpose                 String?                   @db.VarChar
+  status                  String?                   @db.VarChar @default("Pending")
   genarateBonus           GenarateBonus[]
   branches                Branches?                 @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company                 Company?                  @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)

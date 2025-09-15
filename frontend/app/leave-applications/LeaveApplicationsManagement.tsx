@@ -194,7 +194,7 @@ export function LeaveApplicationsManagement() {
             ? new Date(application.toDate).toISOString().split("T")[0]
             : "",
           purpose: application.purpose,
-          status: "Pending" as "Pending" | "Approved" | "Rejected",
+          status: (application.status || "Pending") as "Pending" | "Approved" | "Rejected",
           createdAt: application.createdAt
             ? new Date(application.createdAt).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
@@ -356,24 +356,36 @@ export function LeaveApplicationsManagement() {
     }
   }
 
-  const handleApprove = (id: string) => {
-    setLeaveApplications(prev => 
-      prev.map(application => 
-        application.id === id 
-          ? { ...application, status: "Approved" as const }
-          : application
-      )
-    )
+  const handleApprove = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/leave-application/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Approved" }),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to approve leave application: ${res.status}`)
+      }
+      await loadLeaveApplications()
+    } catch (error) {
+      console.error("Error approving leave application:", error)
+    }
   }
 
-  const handleReject = (id: string) => {
-    setLeaveApplications(prev => 
-      prev.map(application => 
-        application.id === id 
-          ? { ...application, status: "Rejected" as const }
-          : application
-      )
-    )
+  const handleReject = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/leave-application/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Rejected" }),
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to reject leave application: ${res.status}`)
+      }
+      await loadLeaveApplications()
+    } catch (error) {
+      console.error("Error rejecting leave application:", error)
+    }
   }
 
   return (

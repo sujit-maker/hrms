@@ -8,7 +8,28 @@ export class WorkShiftService {
   constructor(private prisma: PrismaService) {}
 
   create(data: CreateWorkShiftDto) {
-    return this.prisma.workShift.create({ data });
+    const { workShiftDays, ...workShiftData } = data;
+    
+    return this.prisma.workShift.create({
+      data: {
+        ...workShiftData,
+        workShiftDay: workShiftDays ? {
+          create: workShiftDays.map(day => ({
+            weekDay: day.weekDay,
+            weeklyOff: day.weeklyOff,
+            startTime: day.startTime,
+            endTime: day.endTime,
+            totalMinutes: day.totalMinutes,
+          }))
+        } : undefined,
+      },
+      include: {
+        branches: true,
+        company: true,
+        serviceProvider: true,
+        workShiftDay: true,
+      },
+    });
   }
 
   findAll() {
@@ -35,13 +56,41 @@ export class WorkShiftService {
   }
 
   update(id: number, data: UpdateWorkShiftDto) {
+    const { workShiftDays, ...workShiftData } = data;
+    
     return this.prisma.workShift.update({
       where: { id },
-      data,
+      data: {
+        ...workShiftData,
+        workShiftDay: workShiftDays ? {
+          deleteMany: {}, // Delete existing workShiftDay records
+          create: workShiftDays.map(day => ({
+            weekDay: day.weekDay,
+            weeklyOff: day.weeklyOff,
+            startTime: day.startTime,
+            endTime: day.endTime,
+            totalMinutes: day.totalMinutes,
+          }))
+        } : undefined,
+      },
+      include: {
+        branches: true,
+        company: true,
+        serviceProvider: true,
+        workShiftDay: true,
+      },
     });
   }
 
   remove(id: number) {
-    return this.prisma.workShift.delete({ where: { id } });
+    return this.prisma.$transaction(async (prisma) => {
+      // First delete all related WorkShiftDay records
+      await prisma.workShiftDay.deleteMany({
+        where: { workShiftID: id }
+      });
+      
+      // Then delete the WorkShift record
+      return prisma.workShift.delete({ where: { id } });
+    });
   }
 }

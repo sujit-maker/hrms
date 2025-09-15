@@ -34,6 +34,12 @@ interface Holiday {
   type: string
 }
 
+interface SelectedItem {
+  display: string
+  value: number
+  item: any
+}
+
 interface LeavePolicy {
   id: number
   serviceProviderID?: number
@@ -51,18 +57,7 @@ interface LeavePolicy {
   createdAt?: string
 }
 
-// Mock holiday data
-const mockHolidays: Holiday[] = [
-  { id: "1", name: "New Year's Day", date: "2024-01-01", type: "National" },
-  { id: "2", name: "Republic Day", date: "2024-01-26", type: "National" },
-  { id: "3", name: "Independence Day", date: "2024-08-15", type: "National" },
-  { id: "4", name: "Gandhi Jayanti", date: "2024-10-02", type: "National" },
-  { id: "5", name: "Diwali", date: "2024-11-01", type: "Religious" },
-  { id: "6", name: "Christmas", date: "2024-12-25", type: "Religious" },
-  { id: "7", name: "Holi", date: "2024-03-25", type: "Religious" },
-  { id: "8", name: "Eid", date: "2024-04-10", type: "Religious" },
-]
-
+// Holidays list fetched from Manage Holiday API (only holidayName is used)
 const BACKEND_URL = "http://localhost:8000"
 
 export function LeavePolicyManagement() {
@@ -84,6 +79,34 @@ export function LeavePolicyManagement() {
     earnLeaveCount: 0,
     applicableHolidays: [] as Holiday[]
   })
+  const [availableHolidays, setAvailableHolidays] = useState<Holiday[]>([])
+
+  // Load available holidays from Manage Holiday API (unique by name, keep real IDs)
+  const loadAvailableHolidays = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/manage-holiday`)
+      const data = await response.json()
+      const map = new Map<string, number>()
+      ;(Array.isArray(data) ? data : []).forEach((h: any) => {
+        const name = (h?.holidayName || "").trim()
+        const id = typeof h?.id === 'number' ? h.id : undefined
+        if (name && typeof id === 'number' && !map.has(name)) {
+          map.set(name, id)
+        }
+      })
+
+      const mapped: Holiday[] = Array.from(map.entries()).map(([name, id]) => ({
+        id: String(id),
+        name,
+        date: "",
+        type: "",
+      }))
+      setAvailableHolidays(mapped)
+    } catch (error) {
+      console.error("Error fetching holidays:", error)
+      setAvailableHolidays([])
+    }
+  }
 
   // API functions
   const fetchServiceProviders = async (query: string) => {
@@ -131,12 +154,26 @@ export function LeavePolicyManagement() {
       const data = await response.json()
       
       // Map the nested data to flattened structure for display
-      const mappedData = data.map((policy: any) => ({
-        ...policy,
-        serviceProvider: policy.serviceProvider?.companyName || "",
-        companyName: policy.company?.companyName || "",
-        branchName: policy.branches?.branchName || ""
-      }))
+      const mappedData = data.map((policy: any) => {
+        const holidays: Holiday[] = Array.isArray(policy?.leavePolicyHoliday)
+          ? policy.leavePolicyHoliday
+              .map((lph: any, idx: number) => ({
+                id: String(lph?.publicHoliday?.manageHoliday?.id ?? idx),
+                name: lph?.publicHoliday?.manageHoliday?.holidayName || "",
+                date: "",
+                type: "",
+              }))
+              .filter((h: Holiday) => h.name)
+          : []
+
+        return {
+          ...policy,
+          serviceProvider: policy.serviceProvider?.companyName || "",
+          companyName: policy.company?.companyName || "",
+          branchName: policy.branches?.branchName || "",
+          applicableHolidays: holidays,
+        }
+      })
       
       setPolicies(mappedData)
     } catch (error) {
@@ -146,6 +183,7 @@ export function LeavePolicyManagement() {
 
   useEffect(() => {
     loadLeavePolicies()
+    loadAvailableHolidays()
   }, [])
 
   const filteredPolicies = policies.filter(policy =>
@@ -159,15 +197,24 @@ export function LeavePolicyManagement() {
     e.preventDefault()
     
     try {
+      // Send selected ManageHoliday IDs to backend
+      const applicableHolidayIds = (formData.applicableHolidays || [])
+        .map((h) => {
+          const found = availableHolidays.find((ah) => ah.name === h.name)
+          return found ? Number(found.id) : undefined
+        })
+        .filter((id): id is number => typeof id === 'number' && !Number.isNaN(id))
+
       const payload = {
         serviceProviderID: formData.serviceProviderID > 0 ? formData.serviceProviderID : null,
         companyID: formData.companyID > 0 ? formData.companyID : null,
         branchesID: formData.branchesID > 0 ? formData.branchesID : null,
         leavePolicyName: formData.leavePolicyName,
-        sickLeaveCount: formData.sickLeaveCount.toString(),
-        casualLeaveCount: formData.casualLeaveCount.toString(),
-        earnLeaveWorkingMonths: formData.earnLeaveWorkingMonths.toString(),
-        earnLeaveCount: formData.earnLeaveCount
+        sickLeaveCount: String(formData.sickLeaveCount ?? 0),
+        casualLeaveCount: String(formData.casualLeaveCount ?? 0),
+        earnLeaveWorkingMonths: String(formData.earnLeaveWorkingMonths ?? 0),
+        earnLeaveCount: Number(formData.earnLeaveCount ?? 0),
+        applicableHolidayIds,
       }
 
       if (editingPolicy) {
@@ -234,7 +281,7 @@ export function LeavePolicyManagement() {
       casualLeaveCount: parseInt(policy.casualLeaveCount || "0") || 0,
       earnLeaveWorkingMonths: parseInt(policy.earnLeaveWorkingMonths || "0") || 0,
       earnLeaveCount: policy.earnLeaveCount || 0,
-      applicableHolidays: policy.applicableHolidays
+      applicableHolidays: policy.applicableHolidays || []
     })
     setEditingPolicy(policy)
     setIsDialogOpen(true)
@@ -254,27 +301,27 @@ export function LeavePolicyManagement() {
     }
   }
 
-  const handleServiceProviderSelect = (item: any) => {
+  const handleServiceProviderSelect = (selected: SelectedItem) => {
     setFormData(prev => ({
       ...prev,
-      serviceProviderID: item.id,
-      serviceProvider: item.companyName
+      serviceProviderID: selected.value,
+      serviceProvider: selected.display
     }))
   }
 
-  const handleCompanySelect = (item: any) => {
+  const handleCompanySelect = (selected: SelectedItem) => {
     setFormData(prev => ({
       ...prev,
-      companyID: item.id,
-      companyName: item.companyName
+      companyID: selected.value,
+      companyName: selected.display
     }))
   }
 
-  const handleBranchSelect = (item: any) => {
+  const handleBranchSelect = (selected: SelectedItem) => {
     setFormData(prev => ({
       ...prev,
-      branchesID: item.id,
-      branchName: item.branchName
+      branchesID: selected.value,
+      branchName: selected.display
     }))
   }
 
@@ -464,7 +511,7 @@ export function LeavePolicyManagement() {
                 <div className="border rounded-lg p-4 bg-gray-50">
                   <p className="text-sm text-gray-600 mb-4">Select holidays that apply to this leave policy:</p>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {mockHolidays.map((holiday) => {
+                    {availableHolidays.map((holiday) => {
                       const isSelected = formData.applicableHolidays?.some(h => h.id === holiday.id) || false
                       return (
                         <div key={holiday.id} className="flex items-center space-x-3 p-2 hover:bg-gray-100 rounded">
@@ -480,10 +527,7 @@ export function LeavePolicyManagement() {
                               {holiday.name}
                             </Label>
                             <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <span>{holiday.date}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {holiday.type}
-                              </Badge>
+                              {/* Only holiday name is required per requirements */}
                             </div>
                           </div>
                         </div>

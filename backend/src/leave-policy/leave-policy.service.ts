@@ -8,13 +8,53 @@ export class LeavePolicyService {
   constructor(private prisma: PrismaService) {}
 
   async create(createLeavePolicyDto: CreateLeavePolicyDto) {
-    return this.prisma.leavePolicy.create({
-      data: createLeavePolicyDto,
-      include: {
-        serviceProvider: true,
-        company: true,
-        branches: true,
-      },
+    const { applicableHolidayIds, ...rest } = createLeavePolicyDto as any;
+
+    return this.prisma.$transaction(async (prisma) => {
+      const policy = await prisma.leavePolicy.create({
+        data: rest,
+        include: {
+          serviceProvider: true,
+          company: true,
+          branches: true,
+        },
+      });
+
+      // Link selected holidays via PublicHoliday table entries (if provided)
+      if (Array.isArray(applicableHolidayIds) && applicableHolidayIds.length > 0) {
+        for (const manageHolidayID of applicableHolidayIds) {
+          // Reuse existing PublicHoliday for same org + manageHoliday if present
+          let pub = await prisma.publicHoliday.findFirst({
+            where: {
+              manageHolidayID,
+              serviceProviderID: policy.serviceProviderID ?? null,
+              companyID: policy.companyID ?? null,
+              branchesID: policy.branchesID ?? null,
+            },
+          });
+          if (!pub) {
+            pub = await prisma.publicHoliday.create({
+              data: {
+                serviceProviderID: policy.serviceProviderID ?? null,
+                companyID: policy.companyID ?? null,
+                branchesID: policy.branchesID ?? null,
+                manageHolidayID,
+              },
+            });
+          }
+          await prisma.leavePolicyHoliday.create({
+            data: {
+              leavePolicyID: policy.id,
+              publicHolidayID: pub.id,
+              serviceProviderID: policy.serviceProviderID ?? null,
+              companyID: policy.companyID ?? null,
+              branchesID: policy.branchesID ?? null,
+            },
+          });
+        }
+      }
+
+      return policy;
     });
   }
 
@@ -24,6 +64,15 @@ export class LeavePolicyService {
         serviceProvider: true,
         company: true,
         branches: true,
+        leavePolicyHoliday: {
+          include: {
+            publicHoliday: {
+              include: {
+                manageHoliday: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -35,6 +84,13 @@ export class LeavePolicyService {
         serviceProvider: true,
         company: true,
         branches: true,
+        leavePolicyHoliday: {
+          include: {
+            publicHoliday: {
+              include: { manageHoliday: true },
+            },
+          },
+        },
       },
     });
 
@@ -46,29 +102,79 @@ export class LeavePolicyService {
   }
 
   async update(id: number, updateLeavePolicyDto: UpdateLeavePolicyDto) {
-    const leavePolicy = await this.findOne(id);
-    
-    return this.prisma.leavePolicy.update({
-      where: { id },
-      data: updateLeavePolicyDto,
-      include: {
-        serviceProvider: true,
-        company: true,
-        branches: true,
-      },
+    const { applicableHolidayIds, ...rest } = updateLeavePolicyDto as any;
+    await this.findOne(id);
+
+    return this.prisma.$transaction(async (prisma) => {
+      const policy = await prisma.leavePolicy.update({
+        where: { id },
+        data: rest,
+        include: {
+          serviceProvider: true,
+          company: true,
+          branches: true,
+        },
+      });
+
+      if (Array.isArray(applicableHolidayIds)) {
+        // Clear existing links
+        await prisma.leavePolicyHoliday.deleteMany({ where: { leavePolicyID: id } });
+
+        // Re-add links
+        for (const manageHolidayID of applicableHolidayIds) {
+          let pub = await prisma.publicHoliday.findFirst({
+            where: {
+              manageHolidayID,
+              serviceProviderID: policy.serviceProviderID ?? null,
+              companyID: policy.companyID ?? null,
+              branchesID: policy.branchesID ?? null,
+            },
+          });
+          if (!pub) {
+            pub = await prisma.publicHoliday.create({
+              data: {
+                serviceProviderID: policy.serviceProviderID ?? null,
+                companyID: policy.companyID ?? null,
+                branchesID: policy.branchesID ?? null,
+                manageHolidayID,
+              },
+            });
+          }
+          await prisma.leavePolicyHoliday.create({
+            data: {
+              leavePolicyID: policy.id,
+              publicHolidayID: pub.id,
+              serviceProviderID: policy.serviceProviderID ?? null,
+              companyID: policy.companyID ?? null,
+              branchesID: policy.branchesID ?? null,
+            },
+          });
+        }
+      }
+
+      return policy;
     });
   }
 
   async remove(id: number) {
     const leavePolicy = await this.findOne(id);
     
-    // Delete related leavePolicyHoliday records first
-    await this.prisma.leavePolicyHoliday.deleteMany({
-      where: { leavePolicyID: id },
-    });
-    
-    return this.prisma.leavePolicy.delete({
-      where: { id },
+    return this.prisma.$transaction(async (prisma) => {
+      // First delete all related leavePolicyHoliday records
+      await prisma.leavePolicyHoliday.deleteMany({
+        where: { leavePolicyID: id },
+      });
+      
+      // Then delete all related EmpPromotion records that reference this leave policy
+      await prisma.empPromotion.updateMany({
+        where: { leavePolicyID: id },
+        data: { leavePolicyID: null }, // Set to null instead of deleting the promotion
+      });
+      
+      // Finally delete the leave policy record
+      return prisma.leavePolicy.delete({
+        where: { id },
+      });
     });
   }
 }

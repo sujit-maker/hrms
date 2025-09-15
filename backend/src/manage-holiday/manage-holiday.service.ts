@@ -42,6 +42,15 @@ export class ManageHolidayService {
   }
 
   remove(id: number) {
-    return this.prisma.manageHoliday.delete({ where: { id } });
+    return this.prisma.$transaction(async (prisma) => {
+      // First, set manageHolidayID to null in related PublicHoliday records
+      await prisma.publicHoliday.updateMany({
+        where: { manageHolidayID: id },
+        data: { manageHolidayID: null },
+      });
+      
+      // Then delete the ManageHoliday record
+      return prisma.manageHoliday.delete({ where: { id } });
+    });
   }
 }
