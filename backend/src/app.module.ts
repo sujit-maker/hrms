@@ -35,6 +35,7 @@ import { WorkShiftModule } from './work-shift/work-shift.module';
 import { AttlogListenerModule } from './attlog-listener/attlog-listener.module';
 import { EmpAttendanceSyncModule } from './emp-attendance-sync/emp-attendance-sync.module';
 import { TestListenerModule } from './test-listener/test-listener.module';
+import { CalenderModule } from './calender/calender.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { TestListenerModule } from './test-listener/test-listener.module';
     AttlogListenerModule,
     EmpAttendanceSyncModule,
     TestListenerModule,
+    CalenderModule,
   ],
 })
 export class AppModule {}

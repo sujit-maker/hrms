@@ -824,3 +824,37 @@ model WorkShiftDay {
   totalMinutes Int?
   workShift    WorkShift? @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
+
+model CalendarDay {
+  id         Int            @id @default(autoincrement())
+  year       Int
+  month      Int            // 1-12
+  day        Int            // 1-31
+  isoDate    DateTime       @unique
+  weekday    String
+  holidayOnDays HolidayOnDay[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+model Holiday {
+  id        Int            @id @default(autoincrement())
+  name      String
+  slug      String         @unique
+  region    String?        // e.g. "ALL", "Kerala", "Bihar", etc.
+  type      String?        // e.g. "National", "Religious", "Regional"
+  notes     String?
+  holidayOnDays HolidayOnDay[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model HolidayOnDay {
+  id            Int         @id @default(autoincrement())
+  calendarDay   CalendarDay @relation(fields: [calendarDayId], references: [id])
+  calendarDayId Int
+  holiday       Holiday     @relation(fields: [holidayId], references: [id])
+  holidayId     Int
+
+  @@unique([calendarDayId, holidayId])
+}
