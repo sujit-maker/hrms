@@ -249,17 +249,33 @@ model Devices {
   deviceName  String @db.VarChar
   deviceMake  String @db.VarChar
   deviceModel String @db.VarChar
-  deviceSN    String @db.VarChar
+deviceSN String @db.VarChar @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // relations
+  attendanceLogs   AttendanceLogs[]
   empDeviceMapping EmpDeviceMapping[]
   serviceProvider  ServiceProvider?   @relation(fields: [serviceProviderID], references: [id], onDelete: SetNull, onUpdate: NoAction)
   company          Company?           @relation(fields: [companyID], references: [id], onDelete: SetNull, onUpdate: NoAction)
   branches         Branches?          @relation(fields: [branchesID], references: [id], onDelete: SetNull, onUpdate: NoAction)
 }
+
+model AttendanceLogs {
+  id        Int      @id @default(autoincrement())
+  deviceId  Int
+  deviceSN  String   @db.VarChar         
+  userId    String   @db.VarChar
+  logTime   String   @db.VarChar        
+  status    String   @db.VarChar @default("0")
+  workCode  String   @db.VarChar @default("0")
+  rawData   String 
+  processed String   @db.VarChar @default("0")
+  createdAt DateTime @default(now())
+  device    Devices  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
 
 model EmpAttendanceRegularise {
   id                Int              @id @default(autoincrement())
@@ -339,6 +355,25 @@ model PromotionRequest {
   monthlyPayGrade_promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade MonthlyPayGrade? @relation("promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade", fields: [proposedMonthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
 }
+
+model EmpAttendanceLogs {
+  id               Int      @id @default(autoincrement())
+  serviceProviderID Int
+  companyID         Int
+  branchesID        Int
+  deviceID          Int
+  employeeID        Int?
+punchTimeStamp    String   @db.VarChar
+  latitude          Int?
+  longitude         Int?
+  googleMapLink     Int?
+  location          Int?
+  mobileDeviceID    Int?
+  mobileDeviceInfo  Int?
+  exported          Int      @default(0)
+  createdAt         DateTime @default(now())
+}
+
 
 model EmpFieldSiteAttendance {
   id                Int              @id @default(autoincrement())

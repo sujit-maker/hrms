@@ -1065,7 +1065,7 @@ export function ManageEmployeesManagement() {
         } : {}),
       };
 
-console.log("SUBMIT PAYLOAD", payload);
+      console.log("SUBMIT PAYLOAD", payload);
 
       if (editingRow) {
         const res = await fetch(`${API.manageEmp}/${editingRow.id}`, {
@@ -1842,6 +1842,20 @@ console.log("SUBMIT PAYLOAD", payload);
                     )}
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Probation Period</Label>
+                    <Input
+                      value={formData.promotion.probationPeriod}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          promotion: { ...p.promotion, probationPeriod: e.target.value },
+                        }))
+                      }
+                    />
+
+                  </div>
+
                 </div>
 
 
@@ -1886,6 +1900,53 @@ console.log("SUBMIT PAYLOAD", payload);
                           }}
                         >
                           {a.attendancePolicyName}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+
+                <div ref={wsRef} className="space-y-2 relative">
+                  <Label>Work Shifts</Label>
+                  <Input
+                    value={formData.wsAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        wsAutocomplete: val,
+                        workShiftID: null,
+                        promotion: { ...p.promotion, workShiftID: null },
+                      }));
+                      runFetchWS(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchWS(val);
+                    }}
+                    placeholder="Start typing work shifts…"
+                    autoComplete="off"
+                  />
+                  {wsList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {wsLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {wsList.map((a) => (
+                        <div
+                          key={a.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((p) => ({
+                              ...p,
+                              workShiftID: a.id,
+                              wsAutocomplete: a.workShiftName ?? String(a.id),
+                              promotion: { ...p.promotion, workShiftID: a.id },
+                            }));
+                            setWsList([]);
+                          }}
+                        >
+                          {a.workShiftName}
                         </div>
                       ))}
                     </div>
@@ -1986,19 +2047,7 @@ console.log("SUBMIT PAYLOAD", payload);
                     onChange={(e) => setFormData((p) => ({ ...p, emergancyContact: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Probation Period</Label>
-                  <Input
-                    value={formData.promotion.probationPeriod}
-                    onChange={(e) =>
-                      setFormData((p) => ({
-                        ...p,
-                        promotion: { ...p.promotion, probationPeriod: e.target.value },
-                      }))
-                    }
-                  />
 
-                </div>
               </div>
 
               {/* Addresses */}

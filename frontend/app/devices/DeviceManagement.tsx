@@ -77,6 +77,7 @@ interface Branch {
 // ---------------------------
 // Config & helpers
 // ---------------------------
+
 const API = {
   devices: "http://localhost:8000/devices",
   serviceProviders: "http://localhost:8000/service-provider",
@@ -91,7 +92,7 @@ async function fetchJSONSafe<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const raw = await res.json();
-  return (raw?.data ?? raw) as T; // handle { data: [...] } or [...]
+  return (raw?.data ?? raw) as T; 
 }
 
 // ---------------------------

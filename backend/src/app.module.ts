@@ -32,6 +32,9 @@ import { HourlyGradeModule } from './hourly-grade/hourly-grade.module';
 import { BonusSetupModule } from './bonus-setup/bonus-setup.module';
 import { BonousAllocationModule } from './bonous-allocation/bonous-allocation.module';
 import { WorkShiftModule } from './work-shift/work-shift.module';
+import { AttlogListenerModule } from './attlog-listener/attlog-listener.module';
+import { EmpAttendanceSyncModule } from './emp-attendance-sync/emp-attendance-sync.module';
+import { TestListenerModule } from './test-listener/test-listener.module';
 
 @Module({
   imports: [
@@ -70,6 +73,9 @@ import { WorkShiftModule } from './work-shift/work-shift.module';
     BonusSetupModule,
     BonousAllocationModule,
     WorkShiftModule,
+    AttlogListenerModule,
+    EmpAttendanceSyncModule,
+    TestListenerModule,
   ],
 })
 export class AppModule {}
