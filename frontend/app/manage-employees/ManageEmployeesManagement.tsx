@@ -105,11 +105,12 @@ interface ManageEmpRead {
   employeeLastName?: string | null;
   deviceEmpCode?: string | null;
   employeeID?: string | null;
+  joiningDate?: string | null;
+
+  // Basic position fields (now stored directly on ManageEmployee)
   departmentNameID?: ID | null;
   designationID?: ID | null;
   managerID?: ID | null;
-  joiningDate?: string | null;
-
   employmentType?: string | null;
   employmentStatus?: string | null;
   probationPeriod?: string | null;
@@ -117,6 +118,8 @@ interface ManageEmpRead {
   attendancePolicyID?: ID | null;
   leavePolicyID?: ID | null;
   salaryPayGradeType?: string | null;
+  monthlyPayGradeID?: ID | null;
+  hourlyPayGradeID?: ID | null;
 
   businessPhoneNo?: string | null;
   businessEmail?: string | null;
@@ -140,6 +143,16 @@ interface ManageEmpRead {
   contractor?: { id: ID; contractorName?: string | null } | null;
   company?: { id: ID; companyName?: string | null } | null;
   branches?: { id: ID; branchName?: string | null } | null;
+  
+  // Basic position relations
+  departments?: { id: ID; departmentName?: string | null } | null;
+  designations?: { id: ID; designantion?: string | null } | null;
+  manager?: { id: ID; employeeFirstName?: string | null; employeeLastName?: string | null } | null;
+  workShift?: { id: ID; workShiftName?: string | null } | null;
+  attendancePolicy?: { id: ID; attendancePolicyName?: string | null } | null;
+  leavePolicy?: { id: ID; leavePolicyName?: string | null } | null;
+  monthlyPayGrade?: { id: ID; monthlyPayGradeName?: string | null } | null;
+  hourlyPayGrade?: { id: ID; hourlyPayGradeName?: string | null } | null;
 
   // Nested arrays
   empEduQualification?: EduRead[];
@@ -174,7 +187,7 @@ const API = {
   attendancePolicies: "http://localhost:8000/attendance-policy",
   leavePolicies: "http://localhost:8000/leave-policy",
   devices: "http://localhost:8000/devices",
-  monthlyGrades: "http://localhost:8000/monthly-grade",
+  monthlyGrades: "http://localhost:8000/monthly-pay-grade",
   hourlyGrades: "http://localhost:8000/hourly-grade",
 
 };
@@ -207,6 +220,8 @@ async function resolveLabelsForEdit(
   r: ManageEmpRead,
   setFormData: React.Dispatch<React.SetStateAction<any>>
 ) {
+  // Prefer explicit IDs; fall back to related object IDs if present
+  const contractorId = (r as any)?.contractorID ?? (r as any)?.contractor?.id ?? null;
   // run all lookups but don't crash if any fails
   const results = await Promise.allSettled([
     fetchFirstById<{ id: ID; departmentName?: string | null }>(API.departments, r.departmentNameID),
@@ -217,7 +232,7 @@ async function resolveLabelsForEdit(
     fetchFirstById<{ id: ID; leavePolicyName?: string | null }>(API.leavePolicies, r.leavePolicyID),
     // devices list can 404 if route mismatch; treat as empty list
     fetchJSONSafe<any[]>(API.devices),
-    fetchFirstById<{ id: ID; contractorName?: string | null }>(API.contractors, r.contractorID),
+    fetchFirstById<{ id: ID; contractorName?: string | null }>(API.contractors, contractorId),
   ]);
 
   const get = <T,>(i: number, fallback: T | null = null): T | null =>
@@ -232,7 +247,12 @@ async function resolveLabelsForEdit(
   const devicesList = get<any[]>(6, []) || [];
   const contractor = get<{ id: ID; contractorName?: string | null }>(7);
 
-  const mgrFull = mgr ? `${mgr.employeeFirstName ?? ""} ${mgr.employeeLastName ?? ""}`.trim() : "";
+  // Get manager name either from API lookup or from nested relation
+  const mgrFull = mgr 
+    ? `${mgr.employeeFirstName ?? ""} ${mgr.employeeLastName ?? ""}`.trim() 
+    : r.manager 
+      ? `${r.manager.employeeFirstName ?? ""} ${r.manager.employeeLastName ?? ""}`.trim()
+      : "";
 
   setFormData((prev: any) => {
     const devMapForm = (prev.devMapForm || []).map((d: any) => {
@@ -246,12 +266,10 @@ async function resolveLabelsForEdit(
       };
     });
 
-
-
     return {
       ...prev,
       deptAutocomplete: dept?.departmentName ?? prev.deptAutocomplete,
-      contractorID: prev.contractorID ?? (contractor?.id ?? null),
+      contractorID: contractor?.id ?? prev.contractorID,
       contrAutocomplete: contractor?.contractorName ?? prev.contrAutocomplete,
       desgAutocomplete: desg?.designantion ?? prev.desgAutocomplete,
       mgrAutocomplete: mgrFull || prev.mgrAutocomplete,
@@ -260,8 +278,6 @@ async function resolveLabelsForEdit(
       lpAutocomplete: lp?.leavePolicyName ?? prev.lpAutocomplete,
       devMapForm,
     };
-
-
   });
 }
 
@@ -390,13 +406,9 @@ export function ManageEmployeesManagement() {
     monthlyPGAutocomplete: "",
     hourlyPGAutocomplete: "",
 
-    employmentType: "",
-    employmentStatus: "",
-    probationPeriod: "",
     workShiftID: null as ID | null,
     attendancePolicyID: null as ID | null,
     leavePolicyID: null as ID | null,
-    salaryPayGradeType: "",
 
     businessPhoneNo: "",
     businessEmail: "",
@@ -581,17 +593,34 @@ export function ManageEmployeesManagement() {
   const runFetchMgr = (q: string) => {
     if (mgrTimerRef.current) clearTimeout(mgrTimerRef.current);
     mgrTimerRef.current = setTimeout(async () => {
-      if (q.length < MIN_CHARS) { setMgrList([]); return; }
       mgrAbortRef.current?.abort();
       const ctrl = new AbortController(); mgrAbortRef.current = ctrl;
       setMgrLoading(true);
       try {
         const all = await fetchJSONSafe<Mgr[]>(API.manageEmp, ctrl.signal);
-        const filtered = (all || []).filter(m => {
-          const name = `${m.employeeFirstName ?? ""} ${m.employeeLastName ?? ""}`.trim().toLowerCase();
-          return name.includes(q.toLowerCase());
-        });
+        // Fallback to already-loaded table rows if API returns empty (e.g., pagination/server filter)
+        const source: any[] = Array.isArray(all) && all.length ? all : (rows as any[]);
+        const ql = (q || "").trim().toLowerCase();
+        const filtered = ql.length >= MIN_CHARS
+          ? (source || []).filter(m => {
+              const name = `${m.employeeFirstName ?? ""} ${m.employeeLastName ?? ""}`.trim().toLowerCase();
+              return name.includes(ql);
+            })
+          : (source || []); // show initial suggestions when empty
         setMgrList(filtered.slice(0, 20));
+      } catch (e) {
+        if ((e as any)?.name !== "AbortError") {
+          console.error("Manager fetch error:", e);
+          // Fallback to table rows on error
+          const ql = (q || "").trim().toLowerCase();
+          const filtered = ql.length >= MIN_CHARS
+            ? (rows || []).filter((m: any) => {
+                const name = `${m.employeeFirstName ?? ""} ${m.employeeLastName ?? ""}`.trim().toLowerCase();
+                return name.includes(ql);
+              })
+            : (rows || []);
+          setMgrList(filtered.slice(0, 20));
+        }
       } finally { setMgrLoading(false); }
     }, DEBOUNCE_MS);
   };
@@ -876,13 +905,9 @@ export function ManageEmployeesManagement() {
       monthlyPGAutocomplete: "",
       hourlyPGAutocomplete: "",
 
-      employmentType: "",
-      employmentStatus: "",
-      probationPeriod: "",
       workShiftID: null,
       attendancePolicyID: null,
       leavePolicyID: null,
-      salaryPayGradeType: "",
 
       businessPhoneNo: "",
       businessEmail: "",
@@ -956,6 +981,25 @@ export function ManageEmployeesManagement() {
   /* ===============
      CRUD submit
      =============== */
+  // Only create/update promotion when meaningful fields are filled
+  const hasPromotionData = () => {
+    const p = formData.promotion as any;
+    if (!p) return false;
+    return Boolean(
+      p?.departmentNameID ||
+      p?.designationID ||
+      p?.managerID ||
+      (p?.employmentType && String(p.employmentType).trim() !== "") ||
+      (p?.employmentStatus && String(p.employmentStatus).trim() !== "") ||
+      (p?.probationPeriod && String(p.probationPeriod).trim() !== "") ||
+      p?.workShiftID != null ||
+      p?.attendancePolicyID != null ||
+      p?.leavePolicyID != null ||
+      (p?.salaryPayGradeType && String(p.salaryPayGradeType).trim() !== "") ||
+      p?.monthlyPayGradeID != null ||
+      p?.hourlyPayGradeID != null
+    );
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -1016,6 +1060,20 @@ export function ManageEmployeesManagement() {
         employeeID: formData.employeeID || undefined,
         joiningDate: formData.joiningDate || undefined,
 
+        // Basic position fields (now stored directly on ManageEmployee)
+        departmentNameID: formData.departmentNameID ?? undefined,
+        designationID: formData.designationID ?? undefined,
+        managerID: formData.managerID ?? undefined,
+        employmentType: formData.promotion.employmentType || undefined,
+        employmentStatus: formData.promotion.employmentStatus || undefined,
+        probationPeriod: formData.promotion.probationPeriod || undefined,
+        workShiftID: formData.workShiftID ?? undefined,
+        attendancePolicyID: formData.attendancePolicyID ?? undefined,
+        leavePolicyID: formData.leavePolicyID ?? undefined,
+        salaryPayGradeType: formData.promotion.salaryPayGradeType || undefined,
+        monthlyPayGradeID: type === "Monthly" ? formData.promotion?.monthlyPayGradeID ?? undefined : undefined,
+        hourlyPayGradeID: type === "Hourly" ? formData.promotion?.hourlyPayGradeID ?? undefined : undefined,
+
         businessPhoneNo: formData.businessPhoneNo || undefined,
         businessEmail: formData.businessEmail || undefined,
         personalPhoneNo: formData.personalPhoneNo || undefined,
@@ -1038,24 +1096,8 @@ export function ManageEmployeesManagement() {
         exp,
         devices, // <-- IMPORTANT: send as `devices`, not empDeviceMapping
 
-        // Promotion — moved into its own table on backend
-        promotion: {
-          id: formData.promotion?.id,
-          departmentNameID: formData.promotion?.departmentNameID ?? undefined,
-          designationID: formData.promotion?.designationID ?? undefined,
-          managerID: formData.promotion?.managerID ?? undefined,
-          employmentType: formData.promotion?.employmentType || undefined,
-          employmentStatus: formData.promotion?.employmentStatus || undefined,
-          probationPeriod: formData.promotion?.probationPeriod || undefined,
-          workShiftID: formData.promotion?.workShiftID ?? undefined,
-          attendancePolicyID: formData.promotion?.attendancePolicyID ?? undefined,
-          leavePolicyID: formData.promotion?.leavePolicyID ?? undefined,
-          salaryPayGradeType: formData.promotion?.salaryPayGradeType || undefined,
-          monthlyPayGradeID:
-            type === "Monthly" ? formData.promotion?.monthlyPayGradeID ?? undefined : undefined,
-          hourlyPayGradeID:
-            type === "Hourly" ? formData.promotion?.hourlyPayGradeID ?? undefined : undefined,
-        },
+        // Do not send promotion data from ManageEmployee form
+        // Promotion records should only be created via Employee Promotions form
 
         // Deletions when editing (names expected by UpdateManageEmployeeDto)
         ...(editingRow ? {
@@ -1132,10 +1174,14 @@ export function ManageEmployeesManagement() {
         ? [...(r as any).empPromotion].sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0))[0]
         : null;
 
-    // ✅ use promotion IDs when present
-    const effectiveDeptID = latestPromotion?.departmentNameID ?? r.departmentNameID ?? null;
-    const effectiveDesgID = latestPromotion?.designationID ?? r.designationID ?? null;
-    const effectiveMgrID = latestPromotion?.managerID ?? r.managerID ?? null;
+    // Use data directly from ManageEmployee record (not from promotion)
+    // These fields are now stored directly on the employee record
+    const effectiveDeptID = r.departmentNameID ?? null;
+    const effectiveDesgID = r.designationID ?? null;
+    const effectiveMgrID = r.managerID ?? null;
+    const effectiveWorkShiftID = r.workShiftID ?? null;
+    const effectiveAttendancePolicyID = r.attendancePolicyID ?? null;
+    const effectiveLeavePolicyID = r.leavePolicyID ?? null;
 
 
     setFormData({
@@ -1162,13 +1208,9 @@ export function ManageEmployeesManagement() {
       monthlyPGAutocomplete: "",
       hourlyPGAutocomplete: "",
 
-      employmentType: r.employmentType ?? "",
-      employmentStatus: r.employmentStatus ?? "",
-      probationPeriod: r.probationPeriod ?? "",
-      workShiftID: r.workShiftID ?? null,
-      attendancePolicyID: r.attendancePolicyID ?? null,
-      leavePolicyID: r.leavePolicyID ?? null,
-      salaryPayGradeType: r.salaryPayGradeType ?? "",
+      workShiftID: effectiveWorkShiftID,
+      attendancePolicyID: effectiveAttendancePolicyID,
+      leavePolicyID: effectiveLeavePolicyID,
 
       businessPhoneNo: r.businessPhoneNo ?? "",
       businessEmail: r.businessEmail ?? "",
@@ -1188,16 +1230,13 @@ export function ManageEmployeesManagement() {
       employeeSpouseName: r.employeeSpouseName ?? "",
 
 
-      contrAutocomplete:
-        r.contractor?.contractorName ??
-        r.contractorName ??
-        (r.contractorID ? String(r.contractorID) : ""),
-      wsAutocomplete: r.workShiftID ? String(r.workShiftID) : "",
-      apAutocomplete: r.attendancePolicyID ? String(r.attendancePolicyID) : "",
-      lpAutocomplete: r.leavePolicyID ? String(r.leavePolicyID) : "",
+      contrAutocomplete: "",
+      wsAutocomplete: "",
+      apAutocomplete: "",
+      lpAutocomplete: "",
 
       promotion: latestPromotion ? {
-        id: latestPromotion.id,                         // keep id for UPDATE path
+        id: latestPromotion.id,
         departmentNameID: latestPromotion.departmentNameID ?? null,
         designationID: latestPromotion.designationID ?? null,
         managerID: latestPromotion.managerID ?? null,
@@ -1212,24 +1251,25 @@ export function ManageEmployeesManagement() {
         hourlyPayGradeID: latestPromotion.hourlyPayGradeID ?? null,
       } : {
         id: undefined,
-        departmentNameID: null,
-        designationID: null,
-
-        managerID: null,
-        employmentType: "",
-        employmentStatus: "",
-        probationPeriod: "",
-        workShiftID: null,
-        attendancePolicyID: null,
-        leavePolicyID: null,
-        salaryPayGradeType: "",
-        monthlyPayGradeID: null,
-        hourlyPayGradeID: null,
+        departmentNameID: effectiveDeptID,
+        designationID: effectiveDesgID,
+        managerID: effectiveMgrID,
+        employmentType: r.employmentType ?? "",
+        employmentStatus: r.employmentStatus ?? "",
+        probationPeriod: r.probationPeriod ?? "",
+        workShiftID: effectiveWorkShiftID,
+        attendancePolicyID: effectiveAttendancePolicyID,
+        leavePolicyID: effectiveLeavePolicyID,
+        salaryPayGradeType: r.salaryPayGradeType ?? "",
+        monthlyPayGradeID: r.monthlyPayGradeID ?? null,
+        hourlyPayGradeID: r.hourlyPayGradeID ?? null,
       },
 
       deptAutocomplete: "",
       desgAutocomplete: "",
-      mgrAutocomplete: "",
+      mgrAutocomplete: (r.manager
+        ? `${r.manager.employeeFirstName ?? ""} ${r.manager.employeeLastName ?? ""}`.trim()
+        : ""),
 
       eduForm,
       expForm,
@@ -1237,8 +1277,8 @@ export function ManageEmployeesManagement() {
     });
 
     (async () => {
-      const mpId = latestPromotion?.monthlyPayGradeID ?? null;
-      const hpId = latestPromotion?.hourlyPayGradeID ?? null;
+      const mpId = r.monthlyPayGradeID ?? null;
+      const hpId = r.hourlyPayGradeID ?? null;
 
       if (mpId) {
         const m = await fetchFirstById<MonthlyPG>(API.monthlyGrades, mpId);
@@ -1262,7 +1302,10 @@ export function ManageEmployeesManagement() {
         departmentNameID: effectiveDeptID,
         designationID: effectiveDesgID,
         managerID: effectiveMgrID,
-
+        contractorID: r.contractorID,
+        attendancePolicyID: effectiveAttendancePolicyID,
+        leavePolicyID: effectiveLeavePolicyID,
+        workShiftID: effectiveWorkShiftID,
       } as any,
       setFormData
     );
@@ -1635,7 +1678,7 @@ export function ManageEmployeesManagement() {
                     }}
                     onFocus={(e) => {
                       const val = e.target.value;
-                      if (val.length >= MIN_CHARS) runFetchMgr(val);
+                      runFetchMgr(val); // show suggestions even when empty
                     }}
                     placeholder="Start typing manager…"
                     autoComplete="off"
@@ -1670,7 +1713,13 @@ export function ManageEmployeesManagement() {
               </div>
 
 
-              <div className="grid grid-cols-3 gap-4">
+              <div
+                className={`grid gap-4 ${
+                  formData.promotion.employmentType === "Contract"
+                    ? formData.promotion.employmentStatus === "Probation" ? "grid-cols-4" : "grid-cols-3"
+                    : formData.promotion.employmentStatus === "Probation" ? "grid-cols-3" : "grid-cols-2"
+                }`}
+              >
                 <div className="space-y-2">
                   <Label>Employment Type</Label>
                   <Select
@@ -1716,55 +1765,73 @@ export function ManageEmployeesManagement() {
                   </Select>
                 </div>
 
-                {/* Contractor  */}
-                <div ref={contrRef} className="space-y-2 relative">
-                  <Label>Contractor</Label>
-                  <Input
-                    value={formData.contrAutocomplete}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormData((p) => ({ ...p, contrAutocomplete: val, contractorID: null }));
-                      runFetchContr(val);                 // ✅ was runFetchLP
-                    }}
-                    onFocus={(e) => {
-                      const val = e.target.value;
-                      if (val.length >= MIN_CHARS) runFetchContr(val);  // ✅ ensure correct fetcher
-                    }}
-                    placeholder="Start typing contractor…"
-                    autoComplete="off"
-                  />
-                  {contrList.length > 0 && (
-                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                      {contrLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
-                      {contrList.map((c) => (
-                        <div
-                          key={c.id}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setFormData((p) => ({
-                              ...p,
-                              contractorID: c.id,
-                              contrAutocomplete: c.contractorName ?? String(c.id),
-                              promotion: {
-                                ...p.promotion,
-                                employmentType: p.promotion.employmentType || "Contract",
-                              },
-                            }));
-                            setContrList([]);
-                          }}
+                {formData.promotion.employmentStatus === "Probation" && (
+                  <div className="space-y-2">
+                    <Label>Probation Period</Label>
+                    <Input
+                      value={formData.promotion.probationPeriod}
+                      onChange={(e) =>
+                        setFormData((p) => ({
+                          ...p,
+                          promotion: { ...p.promotion, probationPeriod: e.target.value },
+                        }))
+                      }
+                      placeholder="e.g. 6 months"
+                    />
+                  </div>
+                )}
 
-                        >
-                          {c.contractorName}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+                {/* Contractor - Only visible when Employment Type is "Contract" */}
+                {formData.promotion.employmentType === "Contract" && (
+                  <div ref={contrRef} className="space-y-2 relative">
+                    <Label>Contractor</Label>
+                    <Input
+                      value={formData.contrAutocomplete}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((p) => ({ ...p, contrAutocomplete: val, contractorID: null }));
+                        runFetchContr(val);
+                      }}
+                      onFocus={(e) => {
+                        const val = e.target.value;
+                        if (val.length >= MIN_CHARS) runFetchContr(val);
+                      }}
+                      placeholder="Start typing contractor…"
+                      autoComplete="off"
+                    />
+                    {contrList.length > 0 && (
+                      <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                        {contrLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                        {contrList.map((c) => (
+                          <div
+                            key={c.id}
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setFormData((p) => ({
+                                ...p,
+                                contractorID: c.id,
+                                contrAutocomplete: c.contractorName ?? String(c.id),
+                                promotion: {
+                                  ...p.promotion,
+                                  employmentType: p.promotion.employmentType || "Contract",
+                                },
+                              }));
+                              setContrList([]);
+                            }}
+
+                          >
+                            {c.contractorName}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>  
 
               {/* Policy / Shift IDs */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 {/* Salary Pay Grade Type + conditional autocompletes */}
                 <div className="space-y-3">
                   <div className="space-y-2">
@@ -1858,7 +1925,6 @@ export function ManageEmployeesManagement() {
 
                 </div>
 
-
                 {/* Attendance Policy */}
                 <div ref={apRef} className="space-y-2 relative">
                   <Label>Attendance Policy</Label>
@@ -1905,7 +1971,7 @@ export function ManageEmployeesManagement() {
                     </div>
                   )}
                 </div>
-
+              </div>
 
                 <div ref={wsRef} className="space-y-2 relative">
                   <Label>Work Shifts</Label>
@@ -1953,7 +2019,10 @@ export function ManageEmployeesManagement() {
                   )}
                 </div>
 
-                {/* Leave Policy */}
+              {/* Leave Policy and Work Shifts */}
+              <div className="grid grid-cols-2 gap-4">
+
+        {/* Leave Policy */}
                 <div ref={lpRef} className="space-y-2 relative">
                   <Label>Leave Policy</Label>
                   <Input
@@ -2000,6 +2069,52 @@ export function ManageEmployeesManagement() {
                   )}
                 </div>
 
+                {/* Work Shifts */}
+                <div ref={wsRef} className="space-y-2 relative">
+                  <Label>Work Shifts</Label>
+                  <Input
+                    value={formData.wsAutocomplete}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData((p) => ({
+                        ...p,
+                        wsAutocomplete: val,
+                        workShiftID: null,
+                        promotion: { ...p.promotion, workShiftID: null },
+                      }));
+                      runFetchWS(val);
+                    }}
+                    onFocus={(e) => {
+                      const val = e.target.value;
+                      if (val.length >= MIN_CHARS) runFetchWS(val);
+                    }}
+                    placeholder="Start typing work shifts…"
+                    autoComplete="off"
+                  />
+                  {wsList.length > 0 && (
+                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
+                      {wsLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
+                      {wsList.map((a) => (
+                        <div
+                          key={a.id}
+                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setFormData((p) => ({
+                              ...p,
+                              workShiftID: a.id,
+                              wsAutocomplete: a.workShiftName ?? String(a.id),
+                              promotion: { ...p.promotion, workShiftID: a.id },
+                            }));
+                            setWsList([]);
+                          }}
+                        >
+                          {a.workShiftName}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Contacts */}
@@ -2047,6 +2162,8 @@ export function ManageEmployeesManagement() {
                     onChange={(e) => setFormData((p) => ({ ...p, emergancyContact: e.target.value }))}
                   />
                 </div>
+
+                {/* Probation Period moved next to Employment Status above */}
 
               </div>
 
@@ -2527,6 +2644,8 @@ export function ManageEmployeesManagement() {
                   <TableHead className="w-[110px]">Service Provider</TableHead>
                   <TableHead className="w-[120px]">Company</TableHead>
                   <TableHead className="w-[110px]">Branch</TableHead>
+                  <TableHead className="w-[140px]">Department</TableHead>
+                  <TableHead className="w-[140px]">Designation</TableHead>
                   <TableHead className="w-[180px]">Name</TableHead>
                   <TableHead className="w-[120px]">Employee ID</TableHead>
                   <TableHead className="w-[160px]">Business Email</TableHead>
@@ -2536,7 +2655,7 @@ export function ManageEmployeesManagement() {
               <TableBody>
                 {filteredRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <Icon icon="mdi:account-group-outline" className="w-12 h-12 text-gray-300" />
                         <p>No employees found</p>
@@ -2550,6 +2669,8 @@ export function ManageEmployeesManagement() {
                       <TableCell className="whitespace-nowrap">{spName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{coName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{brName(r)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.departments?.departmentName ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.designations?.designantion ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.employeeFirstName} {r.employeeLastName}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.employeeID ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.businessEmail ?? "—"}</TableCell>

@@ -25,7 +25,7 @@ import {
 } from "../components/ui/table";
 import { Badge } from "../components/ui/badge";
 import { Icon } from "@iconify/react";
-import { Plus, Search, Edit, Trash2, Eye, CheckCircle } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Eye, CheckCircle, History } from "lucide-react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/ui/select";
 
 /** ========= Types aligned to backend ========= */
@@ -60,7 +60,7 @@ interface EmpRow {
   departments?: { id: ID; departmentName?: string | null } | null;
   designations?: { id: ID; designantion?: string | null } | null;
 
-  // 🔽 NEW: latest values live here
+  // 🔽 NEW: latest values live here with nested relations
   empPromotion?: Array<{
     id: ID;
     manageEmployeeID?: ID | null;
@@ -76,6 +76,14 @@ interface EmpRow {
     salaryPayGradeType?: string | null;
     monthlyPayGradeID?: ID | null;
     hourlyPayGradeID?: ID | null;
+    // Nested relation objects
+    departments?: { id: ID; departmentName?: string | null } | null;
+    designations?: { id: ID; designantion?: string | null } | null;
+    workShift?: { id: ID; workShiftName?: string | null } | null;
+    attendancePolicy?: { id: ID; attendancePolicyName?: string | null } | null;
+    leavePolicy?: { id: ID; leavePolicyName?: string | null } | null;
+    hourlyPayGrade?: { id: ID; hourlyPayGradeName?: string | null } | null;
+    monthlyPayGrade?: { id: ID; monthlyPayGradeName?: string | null } | null;
   }> | null;
 }
 
@@ -158,7 +166,7 @@ const API = {
 
 
   // ✅ add monthly/hourly grade endpoints (you mentioned these names earlier)
-  monthlyGrades: "http://localhost:8000/monthly-grade",
+  monthlyGrades: "http://localhost:8000/monthly-pay-grade",
   hourlyGrades:  "http://localhost:8000/hourly-grade",
 
   empCurrent: "http://localhost:8000/emp-current-position",
@@ -373,6 +381,7 @@ managerAutocomplete: string;
     description: string;
     promotionDate: string;
     status: string;
+    promotedSalaryCtc?: string;
 
     currentDeptIdDisplay: string;
     currentManagerIdDisplay: string;
@@ -438,6 +447,7 @@ managerAutocomplete: string;
     description: "",
     promotionDate: "",
     status: "Not Applied",
+    promotedSalaryCtc: "",
 
     currentDeptIdDisplay: "",
     currentManagerIdDisplay: "",
@@ -490,6 +500,8 @@ interface EmpPromotionRow {
   monthlyPayGradeID: ID | null;
   hourlyPayGradeID: ID | null;
 
+  promotedSalaryCtc?: number | null;
+
   // nested names (as returned in your sample)
   departments?: { id: ID; departmentName?: string | null } | null;
   designations?: { id: ID; designantion?: string | null } | null;
@@ -511,11 +523,21 @@ interface EmpPromotionRow {
 
 
   /** ======= load list ======= */
+const [allRows, setAllRows] = useState<EmpPromotionRow[]>([]);
 const fetchRows = async () => {
   try {
     setLoading(true);
-    const data = await fetchJSONSafe<EmpPromotionRow[]>(API.empPromotion); // ✅ correct type + endpoint
-    setRows(Array.isArray(data) ? data : (data ?? []));
+    const data = await fetchJSONSafe<EmpPromotionRow[]>(API.empPromotion);
+    const list = Array.isArray(data) ? data : (data ?? []);
+    setAllRows(list);
+    // Keep only latest row per employee (by highest id)
+    const latestByEmp = new Map<ID, EmpPromotionRow>();
+    for (const row of list) {
+      const key = row.manageEmployeeID ?? row.manageEmployee?.id ?? 0;
+      const cur = latestByEmp.get(key);
+      if (!cur || (row.id ?? 0) > (cur.id ?? 0)) latestByEmp.set(key, row);
+    }
+    setRows(Array.from(latestByEmp.values()).sort((a, b) => (b.id ?? 0) - (a.id ?? 0)));
   } catch (e: any) {
     setError(e?.message || "Failed to load");
   } finally {
@@ -662,7 +684,7 @@ const runFetchAttPolicy = (q: string) =>
     setLoading: setAttPolicyLoading, setList: setAttPolicyList,
     endpoint: API.attendancePolicies,
     proj: (raw) => raw as any[],
-    filter: (x) => (x.policyName ?? "").toLowerCase().includes(q.toLowerCase()),
+    filter: (x) => (x.attendancePolicyName ?? "").toLowerCase().includes(q.toLowerCase()),
   });
 
 const runFetchLeavePolicy = (q: string) =>
@@ -671,7 +693,7 @@ const runFetchLeavePolicy = (q: string) =>
     setLoading: setLeavePolicyLoading, setList: setLeavePolicyList,
     endpoint: API.leavePolicies,
     proj: (raw) => raw as any[],
-    filter: (x) => (x.policyName ?? "").toLowerCase().includes(q.toLowerCase()),
+    filter: (x) => (x.leavePolicyName ?? "").toLowerCase().includes(q.toLowerCase()),
   });
 
 const runFetchMonthlyPG = (q: string) =>
@@ -761,10 +783,37 @@ const runFetchHourlyPG = (q: string) =>
     return [empName, empId, dept, desg, etype, estatus, ptype].some((x) => x.includes(t));
   });
 }, [rows, searchTerm]);
+  // History modal state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyRows, setHistoryRows] = useState<EmpPromotionRow[]>([]);
+
+  const handleHistory = async (row: EmpPromotionRow) => {
+    const empId = row.manageEmployeeID;
+    let items = (allRows || []).filter((x) => x.manageEmployeeID === empId);
+
+    // Sort from oldest to newest by date if available; otherwise by id
+    const getTime = (x: any) => {
+      const d = (x?.promotionDate ?? x?.createdAt) as string | undefined;
+      const t = d ? Date.parse(d) : NaN;
+      return Number.isNaN(t) ? undefined : t;
+    };
+    items.sort((a: any, b: any) => {
+      const ta = getTime(a);
+      const tb = getTime(b);
+      if (ta != null && tb != null) return ta - tb;
+      if (ta != null) return -1;
+      if (tb != null) return 1;
+      return (a?.id ?? 0) - (b?.id ?? 0);
+    });
+
+    setHistoryRows(items);
+    setIsHistoryOpen(true);
+  };
 
 
 
-  /** ======= when employee selected, prefill “Current Position Information” ======= */
+
+  /** ======= when employee selected, prefill "Current Position Information" ======= */
   const prefillFromEmployee = async (emp: EmpRow) => {
     // 🔹 Take the latest promotion row (highest id)
     const latest =
@@ -773,6 +822,7 @@ const runFetchHourlyPG = (q: string) =>
         : null;
 
     // Build full promotion object (include nulls)
+    // If no promotion data, try to get current info from employee record itself
     const promotionObj = latest
       ? {
         id: latest.id,
@@ -793,19 +843,97 @@ const runFetchHourlyPG = (q: string) =>
       : {
         id: undefined,
         manageEmployeeID: emp.id ?? null,
-        departmentNameID: null,
-        designationID: null,
-        managerID: null,
-        employmentType: "",
-        employmentStatus: "",
-        probationPeriod: "",
-        workShiftID: null,
-        attendancePolicyID: null,
-        leavePolicyID: null,
-        salaryPayGradeType: "",
-        monthlyPayGradeID: null,
-        hourlyPayGradeID: null,
+        // 🔹 FALLBACK: Try to get current info from employee record itself
+        departmentNameID: (emp as any).departmentNameID ?? null,
+        designationID: (emp as any).designationID ?? null,
+        managerID: (emp as any).managerID ?? null,
+        employmentType: (emp as any).employmentType ?? "",
+        employmentStatus: (emp as any).employmentStatus ?? "",
+        probationPeriod: (emp as any).probationPeriod ?? "",
+        workShiftID: (emp as any).workShiftID ?? null,
+        attendancePolicyID: (emp as any).attendancePolicyID ?? null,
+        leavePolicyID: (emp as any).leavePolicyID ?? null,
+        salaryPayGradeType: (emp as any).salaryPayGradeType ?? "",
+        monthlyPayGradeID: (emp as any).monthlyPayGradeID ?? null,
+        hourlyPayGradeID: (emp as any).hourlyPayGradeID ?? null,
       };
+
+
+    // Extract nested relation names directly from latest promotion
+    // If no promotion data, try to get from employee record's nested relations
+    let deptName = latest?.departments?.departmentName ?? (emp as any).departments?.departmentName ?? "";
+    let desgName = latest?.designations?.designantion ?? (emp as any).designations?.designantion ?? "";
+    let workShiftName = latest?.workShift?.workShiftName ?? (emp as any).workShift?.workShiftName ?? "";
+    let attendancePolicyName = latest?.attendancePolicy?.attendancePolicyName ?? (emp as any).attendancePolicy?.attendancePolicyName ?? "";
+    let leavePolicyName = latest?.leavePolicy?.leavePolicyName ?? (emp as any).leavePolicy?.leavePolicyName ?? "";
+    let monthlyPGName = latest?.monthlyPayGrade?.monthlyPayGradeName ?? (emp as any).monthlyPayGrade?.monthlyPayGradeName ?? "";
+    let hourlyPGName = latest?.hourlyPayGrade?.hourlyPayGradeName ?? (emp as any).hourlyPayGrade?.hourlyPayGradeName ?? "";
+
+
+    // If we don't have the nested data from promotion, try to fetch individual pieces
+    
+    if (!deptName && promotionObj.departmentNameID) {
+      try {
+        const dept = await fetchJSONSafe<{ departmentName?: string }>(`${API.departments}/${promotionObj.departmentNameID}`);
+        deptName = dept?.departmentName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch department name:", e);
+      }
+    }
+
+    if (!desgName && promotionObj.designationID) {
+      try {
+        const desg = await fetchJSONSafe<{ designantion?: string }>(`${API.designations}/${promotionObj.designationID}`);
+        desgName = desg?.designantion ?? "";
+      } catch (e) {
+        console.warn("Could not fetch designation name:", e);
+      }
+    }
+
+    if (!workShiftName && promotionObj.workShiftID) {
+      try {
+        const ws = await fetchJSONSafe<{ workShiftName?: string }>(`${API.workShifts}/${promotionObj.workShiftID}`);
+        workShiftName = ws?.workShiftName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch work shift name:", e);
+      }
+    }
+
+    if (!attendancePolicyName && promotionObj.attendancePolicyID) {
+      try {
+        const ap = await fetchJSONSafe<{ attendancePolicyName?: string }>(`${API.attendancePolicies}/${promotionObj.attendancePolicyID}`);
+        attendancePolicyName = ap?.attendancePolicyName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch attendance policy name:", e);
+      }
+    }
+
+    if (!leavePolicyName && promotionObj.leavePolicyID) {
+      try {
+        const lp = await fetchJSONSafe<{ leavePolicyName?: string }>(`${API.leavePolicies}/${promotionObj.leavePolicyID}`);
+        leavePolicyName = lp?.leavePolicyName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch leave policy name:", e);
+      }
+    }
+
+    if (!monthlyPGName && promotionObj.monthlyPayGradeID) {
+      try {
+        const mpg = await fetchJSONSafe<{ monthlyPayGradeName?: string }>(`${API.monthlyGrades}/${promotionObj.monthlyPayGradeID}`);
+        monthlyPGName = mpg?.monthlyPayGradeName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch monthly pay grade name:", e);
+      }
+    }
+
+    if (!hourlyPGName && promotionObj.hourlyPayGradeID) {
+      try {
+        const hpg = await fetchJSONSafe<{ hourlyPayGradeName?: string }>(`${API.hourlyGrades}/${promotionObj.hourlyPayGradeID}`);
+        hourlyPGName = hpg?.hourlyPayGradeName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch hourly pay grade name:", e);
+      }
+    }
 
     // Base identity + promotion object
     setFormData((p) => ({
@@ -820,49 +948,46 @@ const runFetchHourlyPG = (q: string) =>
       // Save full promotion object into formData
       promotion: promotionObj,
 
-      // Displays (names resolved later)
+      // Current position display fields populated from nested data
       currentDeptIdDisplay: promotionObj.departmentNameID != null ? String(promotionObj.departmentNameID) : "",
       currentDesgIdDisplay: promotionObj.designationID != null ? String(promotionObj.designationID) : "",
       currentManagerIdDisplay: promotionObj.managerID != null ? String(promotionObj.managerID) : "",
-      currentDeptNameDisplay: "",
-      currentDesgNameDisplay: "",
-      currentManagerNameDisplay: "",
-      currentSalaryPayGradeTypeDisplay: promotionObj.salaryPayGradeType,
-      currentEmploymentTypeDisplay: promotionObj.employmentType,
-      currentEmploymentStatusDisplay: promotionObj.employmentStatus,
+      currentDeptNameDisplay: deptName || (promotionObj.departmentNameID || promotionObj.designationID || promotionObj.workShiftID || promotionObj.attendancePolicyID || promotionObj.leavePolicyID ? "Loading..." : "Not assigned"),
+      currentDesgNameDisplay: desgName || (promotionObj.departmentNameID || promotionObj.designationID || promotionObj.workShiftID || promotionObj.attendancePolicyID || promotionObj.leavePolicyID ? "Loading..." : "Not assigned"),
+      currentSalaryPayGradeTypeDisplay: promotionObj.salaryPayGradeType || "Not set",
+      currentEmploymentTypeDisplay: promotionObj.employmentType || "Not set",
+      currentEmploymentStatusDisplay: promotionObj.employmentStatus || "Not set",
       currentProbationPeriodDisplay: promotionObj.probationPeriod,
+
+      // Set autocomplete fields for current position
+      deptCurrAutocomplete: deptName,
+      desgCurrAutocomplete: desgName,
+
+      // Set autocomplete fields for policies and grades
+      workShiftAutocomplete: workShiftName || (promotionObj.workShiftID ? "Loading..." : "Not assigned"),
+      attPolicyAutocomplete: attendancePolicyName || (promotionObj.attendancePolicyID ? "Loading..." : "Not assigned"),
+      leavePolicyAutocomplete: leavePolicyName || (promotionObj.leavePolicyID ? "Loading..." : "Not assigned"),
+      monthlyPGAutocomplete: promotionObj.salaryPayGradeType === "Monthly" ? (monthlyPGName || (promotionObj.monthlyPayGradeID ? "Loading..." : "Not assigned")) : "",
+      hourlyPGAutocomplete: promotionObj.salaryPayGradeType === "Hourly" ? (hourlyPGName || (promotionObj.hourlyPayGradeID ? "Loading..." : "Not assigned")) : "",
     }));
 
-    // 🔹 Resolve Dept / Desg / Manager names
-    try {
-      const [deptRes, desgRes, mgrEmp] = await Promise.all([
-        promotionObj.departmentNameID
-          ? fetchJSONSafe<any>(`${API.departments}/${promotionObj.departmentNameID}`)
-          : Promise.resolve(null),
-        promotionObj.designationID
-          ? fetchJSONSafe<any>(`${API.designations}/${promotionObj.designationID}`)
-          : Promise.resolve(null),
-        promotionObj.managerID
-          ? fetchJSONSafe<any>(`${API.manageEmp}/${promotionObj.managerID}`)
-          : Promise.resolve(null),
-      ]);
 
-      const mgrName =
-        mgrEmp
+    // 🔹 Resolve Manager name separately since it's not nested in promotion
+    if (promotionObj.managerID) {
+      try {
+        const mgrEmp = await fetchJSONSafe<any>(`${API.manageEmp}/${promotionObj.managerID}`);
+        const mgrName = mgrEmp
           ? `${mgrEmp.employeeFirstName ?? ""} ${mgrEmp.employeeLastName ?? ""}`.trim()
           : "";
 
-      setFormData((p) => ({
-        ...p,
-        currentDeptNameDisplay: deptRes?.departmentName?.trim() || p.currentDeptNameDisplay,
-        currentDesgNameDisplay: desgRes?.designantion?.trim() || p.currentDesgNameDisplay,
-        currentManagerNameDisplay: mgrName || p.currentManagerNameDisplay,
-
-        deptCurrAutocomplete: deptRes?.departmentName?.trim() || p.deptCurrAutocomplete,
-        desgCurrAutocomplete: desgRes?.designantion?.trim() || p.desgCurrAutocomplete,
-      }));
-    } catch (e) {
-      console.warn("Could not resolve dept/desg/manager:", e);
+        setFormData((p) => ({
+          ...p,
+          currentManagerNameDisplay: mgrName,
+          managerAutocomplete: mgrName,
+        }));
+      } catch (e) {
+        console.warn("Could not resolve manager name:", e);
+      }
     }
 
     // 🔹 Still try latest emp-current-position for salary/effective dates
@@ -980,6 +1105,11 @@ const handleSubmit = async (e: React.FormEvent) => {
     const empPromoPayload = {
       manageEmployeeID: formData.manageEmployeeID!, // required
 
+      // Organization fields
+      serviceProviderID: formData.serviceProviderID ?? null,
+      companyID: formData.companyID ?? null,
+      branchesID: formData.branchesID ?? null,
+
       departmentNameID: resolvedDepartmentID,
       designationID:   resolvedDesignationID,
       managerID:       formData.promotion.managerID ?? null,
@@ -995,6 +1125,15 @@ const handleSubmit = async (e: React.FormEvent) => {
       salaryPayGradeType: promotionType, // "Monthly" | "Hourly" | null
       monthlyPayGradeID:  resolvedMonthlyPG,
       hourlyPayGradeID:   resolvedHourlyPG,
+
+      // Additional fields
+      description: formData.description || null,
+      promotedSalaryCtc:
+        formData.newSalaryCtc && String(formData.newSalaryCtc).trim() !== ""
+          ? Number(formData.newSalaryCtc)
+          : null,
+      promotionDate: formData.promotionDate || null,
+      status: formData.status || null,
     };
 
     if (formData.promotion.id) {
@@ -1029,7 +1168,6 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 };
 
-
  
 const handleEdit = async (row: EmpPromotionRow) => {
   // Keep your existing "current" + "manage-emp" prefill logic
@@ -1051,15 +1189,35 @@ const handleEdit = async (row: EmpPromotionRow) => {
     await prefillFromEmployee(emp);
   }
 
-  // Seed the form’s "promotion" block from this row
+  // Seed the form's "promotion" block from this row
   setFormData((p) => ({
     ...p,
     manageEmployeeID: row.manageEmployeeID ?? null,
+    // Populate service provider, company, branch fields
+    serviceProviderID: (row as any).serviceProviderID ?? null,
+    companyID: (row as any).companyID ?? null,
+    branchesID: (row as any).branchesID ?? null,
+    spAutocomplete: (row as any).serviceProvider?.companyName ?? "",
+    coAutocomplete: (row as any).company?.companyName ?? "",
+    brAutocomplete: (row as any).branches?.branchName ?? "",
+    
+    
     empAutocomplete: [
       row.manageEmployee?.employeeFirstName ?? "",
       row.manageEmployee?.employeeLastName ?? "",
       row.manageEmployee?.employeeID ? `- ${row.manageEmployee?.employeeID}` : ""
     ].join(" ").replace(/\s+/g, " ").trim(),
+    
+    // Populate promoted department/designation autocompletes
+    deptNewAutocomplete: row.departments?.departmentName ?? "",
+    desgNewAutocomplete: row.designations?.designantion ?? "",
+    
+    // Populate description, promotion date, status
+    description: (row as any).description ?? "",
+    promotionDate: (row as any).promotionDate ? new Date((row as any).promotionDate).toISOString().split('T')[0] : "",
+    status: (row as any).status ?? "Not Applied",
+    newSalaryCtc: (row as any).promotedSalaryCtc != null ? String((row as any).promotedSalaryCtc) : p.newSalaryCtc,
+    
     promotion: {
       id: row.id,
       manageEmployeeID: row.manageEmployeeID ?? null,
@@ -1081,6 +1239,13 @@ const handleEdit = async (row: EmpPromotionRow) => {
     currentDesgNameDisplay: row.designations?.designantion ?? p.currentDesgNameDisplay,
   }));
 
+  // Clear suggestion lists to prevent highlighting/focus
+  setTimeout(() => {
+    setSpList([]);
+    setCoList([]);
+    setBrList([]);
+  }, 0);
+
   setIsDialogOpen(true);
 };
 
@@ -1096,9 +1261,13 @@ const handleView = (promo: EmpPromotionRow) => {
  // was: const handleDelete = async (id: ID) => { fetch(`${API.promotionReq}/${id}`, ... }
 const handleDelete = async (id: ID) => {
   if (!confirm("Delete this promotion?")) return;
-  const res = await fetch(`${API.empPromotion}/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-  await fetchRows();
+  try {
+    const res = await fetch(`${API.empPromotion}/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text());
+  } finally {
+    // Refresh list once so the deleted row disappears immediately (no multi-click)
+    await fetchRows();
+  }
 };
 
 
@@ -1221,19 +1390,23 @@ managerAutocomplete: "",
                   <Input
                     value={formData.spAutocomplete}
                     onChange={(e) => {
+                      if (editingRow) return; // Prevent changes in edit mode
                       const val = e.target.value;
                       setFormData((p) => ({ ...p, spAutocomplete: val, serviceProviderID: null }));
                       runFetchSP(val);
                     }}
                     onFocus={(e) => {
+                      if (editingRow) return; // Prevent focus actions in edit mode
                       const val = e.target.value;
                       if (val.length >= MIN_CHARS) runFetchSP(val);
                     }}
                     placeholder="Start typing service provider…"
                     autoComplete="off"
                     required
+                    readOnly={editingRow ? true : false}
+                    className={editingRow ? "bg-gray-50 cursor-not-allowed" : ""}
                   />
-                  {spList.length > 0 && (
+                  {spList.length > 0 && !editingRow && (
                     <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
                       {spLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
                       {spList.map((s) => (
@@ -1259,19 +1432,23 @@ managerAutocomplete: "",
                   <Input
                     value={formData.coAutocomplete}
                     onChange={(e) => {
+                      if (editingRow) return; // Prevent changes in edit mode
                       const val = e.target.value;
                       setFormData((p) => ({ ...p, coAutocomplete: val, companyID: null }));
                       runFetchCO(val);
                     }}
                     onFocus={(e) => {
+                      if (editingRow) return; // Prevent focus actions in edit mode
                       const val = e.target.value;
                       if (val.length >= MIN_CHARS) runFetchCO(val);
                     }}
                     placeholder="Start typing company…"
                     autoComplete="off"
                     required
+                    readOnly={editingRow ? true : false}
+                    className={editingRow ? "bg-gray-50 cursor-not-allowed" : ""}
                   />
-                  {coList.length > 0 && (
+                  {coList.length > 0 && !editingRow && (
                     <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
                       {coLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
                       {coList.map((c) => (
@@ -1297,19 +1474,23 @@ managerAutocomplete: "",
                   <Input
                     value={formData.brAutocomplete}
                     onChange={(e) => {
+                      if (editingRow) return; // Prevent changes in edit mode
                       const val = e.target.value;
                       setFormData((p) => ({ ...p, brAutocomplete: val, branchesID: null }));
                       runFetchBR(val);
                     }}
                     onFocus={(e) => {
+                      if (editingRow) return; // Prevent focus actions in edit mode
                       const val = e.target.value;
                       if (val.length >= MIN_CHARS) runFetchBR(val);
                     }}
                     placeholder="Start typing branch…"
                     autoComplete="off"
                     required
+                    readOnly={editingRow ? true : false}
+                    className={editingRow ? "bg-gray-50 cursor-not-allowed" : ""}
                   />
-                  {brList.length > 0 && (
+                  {brList.length > 0 && !editingRow && (
                     <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
                       {brLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
                       {brList.map((b) => (
@@ -1360,8 +1541,16 @@ managerAutocomplete: "",
                             key={m.id}
                             className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
                             onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              prefillFromEmployee(m);
+                            onClick={async () => {
+                              try {
+                                // Fetch full employee data with all nested relations
+                                const fullEmp = await fetchJSONSafe<EmpRow>(`${API.manageEmp}/${m.id}`);
+                                await prefillFromEmployee(fullEmp);
+                              } catch (error) {
+                                console.error("Error fetching full employee data:", error);
+                                // Fallback to using the partial data
+                                await prefillFromEmployee(m);
+                              }
                               setEmpList([]);
                             }}
                           >
@@ -1444,59 +1633,49 @@ managerAutocomplete: "",
                       placeholder="—"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Probation Period</Label>
-                    <Input
-                      value={formData.promotion.probationPeriod || ""}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          promotion: { ...p.promotion, probationPeriod: e.target.value },
-                        }))
-                      }
-                      placeholder="e.g. 6 months"
-                    />
-                  </div>
+                  {formData.promotion.employmentStatus === "Probation" && (
+                    <div className="space-y-2">
+                      <Label>Probation Period</Label>
+                      <Input
+                        value={formData.promotion.probationPeriod || ""}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            promotion: { ...p.promotion, probationPeriod: e.target.value },
+                          }))
+                        }
+                        placeholder="e.g. 6 months"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Work Shift</Label>
                     <Input
-                      value={formData.promotion.workShiftID ?? ""}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          promotion: { ...p.promotion, workShiftID: Number(e.target.value) || null },
-                        }))
-                      }
-                      placeholder="Enter Work Shift ID"
+                      value={formData.workShiftAutocomplete}
+                      readOnly
+                      className="bg-gray-50"
+                      placeholder="—"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Attendance Policy</Label>
                     <Input
-                      value={formData.promotion.attendancePolicyID ?? ""}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          promotion: { ...p.promotion, attendancePolicyID: Number(e.target.value) || null },
-                        }))
-                      }
-                      placeholder="Enter Attendance Policy ID"
+                      value={formData.attPolicyAutocomplete}
+                      readOnly
+                      className="bg-gray-50"
+                      placeholder="—"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Leave Policy</Label>
                     <Input
-                      value={formData.promotion.leavePolicyID ?? ""}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          promotion: { ...p.promotion, leavePolicyID: Number(e.target.value) || null },
-                        }))
-                      }
-                      placeholder="Enter Leave Policy ID"
+                      value={formData.leavePolicyAutocomplete}
+                      readOnly
+                      className="bg-gray-50"
+                      placeholder="—"
                     />
                   </div>
 
@@ -1687,12 +1866,12 @@ managerAutocomplete: "",
           ...p.promotion,
           salaryPayGradeType: val,
           monthlyPayGradeID: val === "Monthly" ? p.promotion.monthlyPayGradeID : null,
-          hourlyPayGradeID:  val === "Hourly"  ? p.promotion.hourlyPayGradeID  : null,
+          // hourlyPayGradeID:  val === "Hourly"  ? p.promotion.hourlyPayGradeID  : null,
         },
 
         // clear the opposite autocomplete label as well
         monthlyPGAutocomplete: val === "Monthly" ? p.monthlyPGAutocomplete : "",
-        hourlyPGAutocomplete:  val === "Hourly"  ? p.hourlyPGAutocomplete  : "",
+        // hourlyPGAutocomplete:  val === "Hourly"  ? p.hourlyPGAutocomplete  : "",
       }))
     }
   >
@@ -1701,7 +1880,7 @@ managerAutocomplete: "",
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="Monthly">Monthly</SelectItem>
-      <SelectItem value="Hourly">Hourly</SelectItem>
+      {/* <SelectItem value="Hourly">Hourly</SelectItem> */}
     </SelectContent>
   </Select>
 </div>
@@ -1756,19 +1935,21 @@ managerAutocomplete: "",
 
 
 
-                  <div className="space-y-2">
-                    <Label>Probation Period</Label>
-                    <Input
-                      value={formData.promotion.probationPeriod || ""}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          promotion: { ...p.promotion, probationPeriod: e.target.value },
-                        }))
-                      }
-                      placeholder="e.g. 6 months"
-                    />
-                  </div>
+                  {formData.promotion.employmentStatus === "Probation" && (
+                    <div className="space-y-2">
+                      <Label>Probation Period</Label>
+                      <Input
+                        value={formData.promotion.probationPeriod || ""}
+                        onChange={(e) =>
+                          setFormData((p) => ({
+                            ...p,
+                            promotion: { ...p.promotion, probationPeriod: e.target.value },
+                          }))
+                        }
+                        placeholder="e.g. 6 months"
+                      />
+                    </div>
+                  )}
 
                <div ref={workShiftRef} className="space-y-2 relative">
   <Label>Work Shift</Label>
@@ -1846,13 +2027,13 @@ managerAutocomplete: "",
           onClick={() => {
             setFormData((p) => ({
               ...p,
-              attPolicyAutocomplete: ap.policyName ?? String(ap.id),
+              attPolicyAutocomplete: ap.attendancePolicyName ?? String(ap.id),
               promotion: { ...p.promotion, attendancePolicyID: ap.id },
             }));
             setAttPolicyList([]);
           }}
         >
-          {ap.policyName}
+          {ap.attendancePolicyName}
         </div>
       ))}
     </div>
@@ -1890,13 +2071,13 @@ managerAutocomplete: "",
           onClick={() => {
             setFormData((p) => ({
               ...p,
-              leavePolicyAutocomplete: lp.policyName ?? String(lp.id),
+              leavePolicyAutocomplete: lp.leavePolicyName ?? String(lp.id),
               promotion: { ...p.promotion, leavePolicyID: lp.id },
             }));
             setLeavePolicyList([]);
           }}
         >
-          {lp.policyName}
+          {lp.leavePolicyName}
         </div>
       ))}
     </div>
@@ -2122,17 +2303,17 @@ managerAutocomplete: "",
                   <TableHead className="w-[120px]">Employee ID</TableHead>
                   <TableHead className="w-[120px]">New Dept</TableHead>
                   <TableHead className="w-[120px]">New Desg</TableHead>
-                  <TableHead className="w-[120px]">Proposed Dept</TableHead>
-                  <TableHead className="w-[120px]">Proposed Desg</TableHead>
+                  {/* <TableHead className="w-[120px]">Proposed Dept</TableHead>
+                  <TableHead className="w-[120px]">Proposed Desg</TableHead> */}
                   <TableHead className="w-[120px]">Promotion Date</TableHead>
-                  <TableHead className="w-[100px] text-right">Actions</TableHead>
+                  <TableHead className="w-[100px] text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
         <TableBody>
   {filteredRows.length === 0 && !loading && (
     <TableRow>
       {/* 8 columns in header => colSpan=8 */}
-      <TableCell colSpan={8} className="text-center text-sm text-gray-500">
+      <TableCell colSpan={8} className="text-center text-sm text-gray-500 py-2">
         No records
       </TableCell>
     </TableRow>
@@ -2145,9 +2326,9 @@ managerAutocomplete: "",
     const newDept = r.departments?.departmentName?.trim() ?? "—";
     const newDesg = r.designations?.designantion?.trim() ?? "—";
 
-    // Proposed fields don't exist in /emp-promotion; show placeholders
-    const proposedDept = "—";
-    const proposedDesg = "—";
+    // Use the same data for proposed fields since they represent the promoted values
+    const proposedDept = r.departments?.departmentName?.trim() ?? "—";
+    const proposedDesg = r.designations?.designantion?.trim() ?? "—";
 
     // /emp-promotion has no official date; try promotionDate if present, else createdAt, else —
     const promoDate =
@@ -2158,44 +2339,49 @@ managerAutocomplete: "",
           : "—";
 
     return (
-      <TableRow key={r.id}>
+      <TableRow key={r.id} className="h-10">
         {/* Status */}
-        <TableCell className="whitespace-nowrap">
+        <TableCell className="whitespace-nowrap py-2">
           {r.employmentStatus ?? "—"}
         </TableCell>
 
         {/* Employee ID */}
-        <TableCell className="whitespace-nowrap">
+        <TableCell className="whitespace-nowrap py-2">
           <div className="font-medium">{empId}</div>
           <div className="text-xs text-gray-500">{empName || "\u00A0"}</div>
         </TableCell>
 
         {/* New Dept */}
-        <TableCell className="whitespace-nowrap">{newDept}</TableCell>
+        <TableCell className="whitespace-nowrap py-2">{newDept}</TableCell>
 
         {/* New Desg */}
-        <TableCell className="whitespace-nowrap">{newDesg}</TableCell>
+        <TableCell className="whitespace-nowrap py-2">{newDesg}</TableCell>
 
         {/* Proposed Dept (placeholder) */}
-        <TableCell className="whitespace-nowrap">{proposedDept}</TableCell>
+        {/* <TableCell className="whitespace-nowrap">{proposedDept}</TableCell> */}
 
         {/* Proposed Desg (placeholder) */}
-        <TableCell className="whitespace-nowrap">{proposedDesg}</TableCell>
+        {/* <TableCell className="whitespace-nowrap">{proposedDesg}</TableCell> */}
 
         {/* Promotion Date */}
-        <TableCell className="whitespace-nowrap">{promoDate}</TableCell>
+        <TableCell className="whitespace-nowrap py-2">{promoDate}</TableCell>
 
         {/* Actions */}
-        <TableCell className="text-right space-x-2">
-          <Button variant="ghost" size="icon" onClick={() => handleView(r)} title="View">
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => handleEdit(r)} title="Edit">
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)} title="Delete">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <TableCell className="text-right py-1">
+          <div className="inline-flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => handleView(r)} title="View">
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleEdit(r)} title="Edit">
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleHistory(r)} title="History">
+              <History className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)} title="Delete">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
     );
@@ -2207,6 +2393,57 @@ managerAutocomplete: "",
           </div>
         </CardContent>
       </Card>
+      {/* History Dialog */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Promotion History</DialogTitle>
+            <DialogDescription>All promotions for this employee</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[160px]">Promotion Date</TableHead>
+                  <TableHead className="w-[160px]">Department</TableHead>
+                  <TableHead className="w-[160px]">Designation</TableHead>
+                  <TableHead className="w-[120px]">Paygrade</TableHead>
+                  <TableHead className="w-[140px]">Emp. Type</TableHead>
+                  <TableHead className="w-[140px]">Emp. Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {historyRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-gray-500">No history</TableCell>
+                  </TableRow>
+                ) : (
+                  historyRows.map((hr) => {
+                    const promoDate = (hr as any)?.promotionDate
+                      ? new Date((hr as any).promotionDate).toLocaleDateString()
+                      : (hr as any)?.createdAt
+                        ? new Date((hr as any).createdAt).toLocaleDateString()
+                        : "—";
+                    return (
+                      <TableRow key={hr.id}>
+                        <TableCell className="whitespace-nowrap">{promoDate}</TableCell>
+                        <TableCell className="whitespace-nowrap">{hr.departments?.departmentName ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{hr.designations?.designantion ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{hr.salaryPayGradeType ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{hr.employmentType ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{hr.employmentStatus ?? "—"}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsHistoryOpen(false)} variant="outline">Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

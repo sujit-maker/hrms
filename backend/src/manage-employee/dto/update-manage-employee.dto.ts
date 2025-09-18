@@ -56,6 +56,7 @@ export class UpdateManageEmployeeDto {
   @IsOptional() @IsInt() serviceProviderID?: number | null;
   @IsOptional() @IsInt() companyID?: number | null;
   @IsOptional() @IsInt() branchesID?: number | null;
+  @IsOptional() @IsInt() contractorID?: number | null;
 
   // Scalars
   @IsOptional() @IsString() employeeFirstName?: string | null;
@@ -81,6 +82,20 @@ export class UpdateManageEmployeeDto {
   @IsOptional() @IsString() employeeFatherName?: string | null;
   @IsOptional() @IsString() employeeMotherName?: string | null;
   @IsOptional() @IsString() employeeSpouseName?: string | null;
+
+  // Basic position fields (stored directly on ManageEmployee)
+  @IsOptional() @IsInt() departmentNameID?: number | null;
+  @IsOptional() @IsInt() designationID?: number | null;
+  @IsOptional() @IsInt() managerID?: number | null;
+  @IsOptional() @IsString() employmentType?: string | null;
+  @IsOptional() @IsString() employmentStatus?: string | null;
+  @IsOptional() @IsString() probationPeriod?: string | null;
+  @IsOptional() @IsInt() workShiftID?: number | null;
+  @IsOptional() @IsInt() attendancePolicyID?: number | null;
+  @IsOptional() @IsInt() leavePolicyID?: number | null;
+  @IsOptional() @IsString() salaryPayGradeType?: string | null;
+  @IsOptional() @IsInt() monthlyPayGradeID?: number | null;
+  @IsOptional() @IsInt() hourlyPayGradeID?: number | null;
 
   // Nested arrays (upsert)
   @IsOptional() @IsArray()

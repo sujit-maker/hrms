@@ -14,6 +14,19 @@ export class ManageEmployeeService {
     companyID,
     branchesID,
     contractorID,
+    // Extract basic position fields
+    departmentNameID,
+    designationID,
+    managerID,
+    employmentType,
+    employmentStatus,
+    probationPeriod,
+    workShiftID,
+    attendancePolicyID,
+    leavePolicyID,
+    salaryPayGradeType,
+    monthlyPayGradeID,
+    hourlyPayGradeID,
     edu = [],
     exp = [],
     devices = [],
@@ -25,13 +38,27 @@ export class ManageEmployeeService {
     data: {
       ...scalars,
 
-      ...(serviceProviderID != null
-        ? { serviceProvider: { connect: { id: serviceProviderID } } }
-        : {}),
-      ...(companyID != null ? { company: { connect: { id: companyID } } } : {}),
-      ...(branchesID != null
-        ? { branches: { connect: { id: branchesID } } }
-        : {}),
+      // Basic position scalars
+      ...(employmentType !== undefined ? { employmentType } : {}),
+      ...(employmentStatus !== undefined ? { employmentStatus } : {}),
+      ...(probationPeriod !== undefined ? { probationPeriod } : {}),
+      ...(salaryPayGradeType !== undefined ? { salaryPayGradeType } : {}),
+
+      // Basic position fields (direct field assignments)
+      ...(departmentNameID != null ? { departmentNameID } : {}),
+      ...(designationID != null ? { designationID } : {}),
+      ...(managerID != null ? { managerID } : {}),
+      ...(workShiftID != null ? { workShiftID } : {}),
+      ...(attendancePolicyID != null ? { attendancePolicyID } : {}),
+      ...(leavePolicyID != null ? { leavePolicyID } : {}),
+      ...(monthlyPayGradeID != null ? { monthlyPayGradeID } : {}),
+      ...(hourlyPayGradeID != null ? { hourlyPayGradeID } : {}),
+
+      // Foreign key fields (use direct assignment instead of relations)
+      serviceProviderID: serviceProviderID ?? undefined,
+      companyID: companyID ?? undefined,
+      branchesID: branchesID ?? undefined,
+      contractorID: contractorID ?? undefined,
 
       // nested creates
       empEduQualification: {
@@ -57,37 +84,33 @@ export class ManageEmployeeService {
       },
       empDeviceMapping: {
         create: devices.map((d) => ({
-          device: { connect: { id: d.deviceID } },
+          deviceID: d.deviceID,
           deviceEmpCode: d.deviceEmpCode ?? null,
         })),
       },
-      empPromotion: promotion
-        ? {
-            create: {
-              departmentNameID: promotion.departmentNameID ?? null,
-              designationID: promotion.designationID ?? null,
-              managerID: promotion.managerID ?? null,
-              employmentType: promotion.employmentType ?? null,
-              employmentStatus: promotion.employmentStatus ?? null,
-              probationPeriod: promotion.probationPeriod ?? null,
-              workShiftID: promotion.workShiftID ?? null,
-              attendancePolicyID: promotion.attendancePolicyID ?? null,
-              leavePolicyID: promotion.leavePolicyID ?? null,
-              salaryPayGradeType: promotion.salaryPayGradeType ?? null,
-              monthlyPayGradeID: promotion.monthlyPayGradeID ?? null,
-              hourlyPayGradeID: promotion.hourlyPayGradeID ?? null,
-            },
-          }
-        : undefined,
-    },
+      // Do not auto-create empPromotion from ManageEmployee create
+      // Promotion records should only be created explicitly via Employee Promotions form
+    } as any,
     include: {
       serviceProvider: true,
       company: true,
       branches: true,
+      contractors: true,
       empEduQualification: true,
       empProfExprience: true,
       empDeviceMapping: { include: { device: true } },
-      empPromotion: true,
+      empPromotion: { 
+        orderBy: { id: 'desc' },
+        include: {
+          departments: true,
+          designations: true,
+          workShift: true,
+          attendancePolicy: true,
+          leavePolicy: true,
+          hourlyPayGrade: true,
+          monthlyPayGrade: true,
+        }
+      },
     },
   });
 }
@@ -100,10 +123,31 @@ export class ManageEmployeeService {
         company: true,
         branches: true,
         contractors: true,
+        // Basic position relations
+        departments: true,
+        designations: true,
+        manager: true,
+        workShift: true,
+        attendancePolicy: true,
+        leavePolicy: true,
+        monthlyPayGrade: true,
+        hourlyPayGrade: true,
         empEduQualification: true,
         empProfExprience: true,
         empDeviceMapping: { include: { device: true } },
- empPromotion: { orderBy: { id: 'desc' } },      },
+        empPromotion: { 
+          orderBy: { id: 'desc' },
+          include: {
+            departments: true,
+            designations: true,
+            workShift: true,
+            attendancePolicy: true,
+            leavePolicy: true,
+            hourlyPayGrade: true,
+            monthlyPayGrade: true,
+          }
+        },
+      },
       orderBy: { id: 'desc' },
     });
   }
@@ -111,15 +155,36 @@ export class ManageEmployeeService {
   findOne(id: number) {
     return this.prisma.manageEmployee.findUnique({
       where: { id },
-      include: {
-        serviceProvider: true,
-        company: true,
-        branches: true,
-        contractors: true,
-        empEduQualification: true,
-        empProfExprience: true,
-        empDeviceMapping: { include: { device: true } },
- empPromotion: { orderBy: { id: 'desc' } },      },
+    include: {
+      serviceProvider: true,
+      company: true,
+      branches: true,
+      contractors: true,
+      // Basic position relations
+      departments: true,
+      designations: true,
+      manager: true,
+      workShift: true,
+      attendancePolicy: true,
+      leavePolicy: true,
+      monthlyPayGrade: true,
+      hourlyPayGrade: true,
+      empEduQualification: true,
+      empProfExprience: true,
+      empDeviceMapping: { include: { device: true } },
+      empPromotion: { 
+        orderBy: { id: 'desc' },
+        include: {
+          departments: true,
+          designations: true,
+          workShift: true,
+          attendancePolicy: true,
+          leavePolicy: true,
+          hourlyPayGrade: true,
+          monthlyPayGrade: true,
+        }
+      },
+    },
     });
   }
 
@@ -128,6 +193,20 @@ export class ManageEmployeeService {
     serviceProviderID,
     companyID,
     branchesID,
+    contractorID,
+    // Extract basic position fields
+    departmentNameID,
+    designationID,
+    managerID,
+    employmentType,
+    employmentStatus,
+    probationPeriod,
+    workShiftID,
+    attendancePolicyID,
+    leavePolicyID,
+    salaryPayGradeType,
+    monthlyPayGradeID,
+    hourlyPayGradeID,
     edu,
     exp,
     devices,
@@ -144,22 +223,29 @@ export class ManageEmployeeService {
       where: { id },
       data: {
         ...scalars,
-        ...(serviceProviderID !== undefined
-          ? serviceProviderID == null
-            ? { serviceProvider: { disconnect: true } }
-            : { serviceProvider: { connect: { id: serviceProviderID } } }
-          : {}),
-        ...(companyID !== undefined
-          ? companyID == null
-            ? { company: { disconnect: true } }
-            : { company: { connect: { id: companyID } } }
-          : {}),
-        ...(branchesID !== undefined
-          ? branchesID == null
-            ? { branches: { disconnect: true } }
-            : { branches: { connect: { id: branchesID } } }
-          : {}),
-      },
+        
+        // Basic position scalars
+        ...(employmentType !== undefined ? { employmentType } : {}),
+        ...(employmentStatus !== undefined ? { employmentStatus } : {}),
+        ...(probationPeriod !== undefined ? { probationPeriod } : {}),
+        ...(salaryPayGradeType !== undefined ? { salaryPayGradeType } : {}),
+        
+        // Basic position fields (direct field assignments)
+        ...(departmentNameID !== undefined ? { departmentNameID } : {}),
+        ...(designationID !== undefined ? { designationID } : {}),
+        ...(managerID !== undefined ? { managerID } : {}),
+        ...(workShiftID !== undefined ? { workShiftID } : {}),
+        ...(attendancePolicyID !== undefined ? { attendancePolicyID } : {}),
+        ...(leavePolicyID !== undefined ? { leavePolicyID } : {}),
+        ...(monthlyPayGradeID !== undefined ? { monthlyPayGradeID } : {}),
+        ...(hourlyPayGradeID !== undefined ? { hourlyPayGradeID } : {}),
+        
+        // Foreign key fields (use direct assignment instead of relations)
+        serviceProviderID: serviceProviderID ?? undefined,
+        companyID: companyID ?? undefined,
+        branchesID: branchesID ?? undefined,
+        contractorID: contractorID ?? undefined,
+      } as any,
     });
 
     // 2) delete removed children
@@ -317,10 +403,31 @@ export class ManageEmployeeService {
         serviceProvider: true,
         company: true,
         branches: true,
+        contractors: true,
+        // Basic position relations
+        departments: true,
+        designations: true,
+        manager: true,
+        workShift: true,
+        attendancePolicy: true,
+        leavePolicy: true,
+        monthlyPayGrade: true,
+        hourlyPayGrade: true,
         empEduQualification: true,
         empProfExprience: true,
         empDeviceMapping: { include: { device: true } },
-        empPromotion: true,
+        empPromotion: { 
+          orderBy: { id: 'desc' },
+          include: {
+            departments: true,
+            designations: true,
+            workShift: true,
+            attendancePolicy: true,
+            leavePolicy: true,
+            hourlyPayGrade: true,
+            monthlyPayGrade: true,
+          }
+        },
       },
     });
   });
@@ -332,18 +439,27 @@ export class ManageEmployeeService {
       // Delete children that FK to manageEmployeeID
       this.prisma.empDeviceMapping.deleteMany({ where: { manageEmployeeID: id } }),
       this.prisma.empProfExprience.deleteMany({ where: { manageEmployeeID: id } }),
-        this.prisma.empEduQualification.deleteMany({ where: { manageEmployeeID: id } }),
+      this.prisma.empEduQualification.deleteMany({ where: { manageEmployeeID: id } }),
       this.prisma.empCurrentPosition.deleteMany({ where: { manageEmployeeID: id } }),
       this.prisma.promotionRequest.deleteMany({ where: { manageEmployeeID: id } }),
       this.prisma.empPromotion.deleteMany({ where: { manageEmployeeID: id } }),
+      
+      // ADDED: Missing tables that reference ManageEmployee
+      this.prisma.empAttendanceRegularise.deleteMany({ where: { manageEmployeeID: id } }),
+      this.prisma.empFieldSiteAttendance.deleteMany({ where: { manageEmployeeID: id } }),
+      this.prisma.genarateBonus.deleteMany({ where: { manageEmployeeID: id } }),
+      this.prisma.leaveApplication.deleteMany({ where: { manageEmployeeID: id } }),
+      
+      // ADDED: BonusAllocation uses employeeID field to reference ManageEmployee
+      this.prisma.bonusAllocation.deleteMany({ where: { employeeID: id } }),
 
-      // ...add other child tables here if they reference ManageEmployee
+      // Finally delete the ManageEmployee record
       this.prisma.manageEmployee.delete({ where: { id } }),
     ]);
     return { success: true };
   } catch (e: any) {
     if (e?.code === 'P2003') {
-      // FK still exists somewhere you didn’t clean up
+      // FK still exists somewhere you didn't clean up
       throw new Error(
         'Cannot delete employee: related records exist (education/experience/mappings/etc).'
       );
