@@ -25,6 +25,7 @@ model AttendancePolicy {
   company                     Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider             ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   empPromotion                EmpPromotion[]
+  manageEmployees             ManageEmployee[] @relation("EmployeeAttendancePolicy")
 }
 
 model BankDetails {
@@ -105,6 +106,7 @@ model Branches {
   empAttendanceRegularise      EmpAttendanceRegularise[]
   empCurrentPosition           EmpCurrentPosition[]
   empFieldSiteAttendance       EmpFieldSiteAttendance[]
+  empPromotion                 EmpPromotion[]
   genarateBonus                GenarateBonus[]
   hourlyPayGrade               HourlyPayGrade[]
   leaveApplication             leaveApplication[]
@@ -155,6 +157,7 @@ model Company {
   empAttendanceRegularise      EmpAttendanceRegularise[]
   empCurrentPosition           EmpCurrentPosition[]
   empFieldSiteAttendance       EmpFieldSiteAttendance[]
+  empPromotion                 EmpPromotion[]
   genarateBonus                GenarateBonus[]
   hourlyPayGrade               HourlyPayGrade[]
   leaveApplication             leaveApplication[]
@@ -212,6 +215,7 @@ model Departments {
   serviceProvider                                                     ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   empCurrentPosition                                                  EmpCurrentPosition[]
   empPromotion                                                        EmpPromotion[]
+  manageEmployees                                                     ManageEmployee[]     @relation("EmployeeDepartment")
   promotionRequest_promotionRequest_currentDepartmentIDTodepartments  PromotionRequest[]   @relation("promotionRequest_currentDepartmentIDTodepartments")
   promotionRequest_promotionRequest_proposedDepartmentIDTodepartments PromotionRequest[]   @relation("promotionRequest_proposedDepartmentIDTodepartments")
 }
@@ -227,6 +231,7 @@ model Designations {
   serviceProvider                                                       ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   empCurrentPosition                                                    EmpCurrentPosition[]
   empPromotion                                                          EmpPromotion[]
+  manageEmployees                                                       ManageEmployee[]     @relation("EmployeeDesignation")
   promotionRequest_promotionRequest_currentDesignationIDTodesignations  PromotionRequest[]   @relation("promotionRequest_currentDesignationIDTodesignations")
   promotionRequest_promotionRequest_proposedDesignationIDTodesignations PromotionRequest[]   @relation("promotionRequest_proposedDesignationIDTodesignations")
 }
@@ -423,6 +428,7 @@ model HourlyPayGrade {
   promotionRequest_promotionRequest_currentHourlyPayGradeIDTohourlyPayGrade  PromotionRequest[]   @relation("promotionRequest_currentHourlyPayGradeIDTohourlyPayGrade")
   promotionRequest_promotionRequest_proposedHourlyPayGradeIDTohourlyPayGrade PromotionRequest[]   @relation("promotionRequest_proposedHourlyPayGradeIDTohourlyPayGrade")
   empPromotion                                                               EmpPromotion[]
+  manageEmployees                                                            ManageEmployee[]     @relation("EmployeeHourlyPayGrade")
 }
 
 model leaveApplication {
@@ -475,6 +481,7 @@ model leavePolicy {
   serviceProvider        ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   leavePolicyHoliday     leavePolicyHoliday[]
   empPromotion           EmpPromotion[]
+  manageEmployees        ManageEmployee[] @relation("EmployeeLeavePolicy")
 
 }
 
@@ -517,6 +524,21 @@ model ManageEmployee {
   employeeFatherName      String?                   @db.VarChar
   employeeMotherName      String?                   @db.VarChar
   employeeSpouseName      String?                   @db.VarChar
+  
+  // Basic employee position fields (separate from promotion history)
+  departmentNameID        Int?
+  designationID           Int?
+  managerID               Int?
+  employmentType          String?                   @db.VarChar
+  employmentStatus        String?                   @db.VarChar
+  probationPeriod         String?                   @db.VarChar
+  workShiftID             Int?
+  attendancePolicyID      Int?
+  leavePolicyID           Int?
+  salaryPayGradeType      String?                   @db.VarChar
+  monthlyPayGradeID       Int?
+  hourlyPayGradeID        Int?
+  
   empAttendanceRegularise EmpAttendanceRegularise[]
   empCurrentPosition      EmpCurrentPosition[]
   empEduQualification     EmpEduQualification[]
@@ -528,6 +550,18 @@ model ManageEmployee {
   company                 Company?                  @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   contractors             Contractors?              @relation(fields: [contractorID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider         ServiceProvider?          @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
+  // Relations for basic position fields
+  departments             Departments?              @relation("EmployeeDepartment", fields: [departmentNameID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations            Designations?             @relation("EmployeeDesignation", fields: [designationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manager                 ManageEmployee?           @relation("EmployeeManager", fields: [managerID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  managedEmployees        ManageEmployee[]          @relation("EmployeeManager")
+  workShift               WorkShift?                @relation("EmployeeWorkShift", fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  attendancePolicy        AttendancePolicy?         @relation("EmployeeAttendancePolicy", fields: [attendancePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leavePolicy             leavePolicy?              @relation("EmployeeLeavePolicy", fields: [leavePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  monthlyPayGrade         MonthlyPayGrade?          @relation("EmployeeMonthlyPayGrade", fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hourlyPayGrade          HourlyPayGrade?           @relation("EmployeeHourlyPayGrade", fields: [hourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  
   promotionRequest        PromotionRequest[]
   empPromotion            EmpPromotion[]
   bonusAllocation         BonusAllocation[]
@@ -536,6 +570,9 @@ model ManageEmployee {
 model EmpPromotion {
   id                 Int          @id @default(autoincrement())
   manageEmployeeID   Int
+  serviceProviderID  Int?
+  companyID          Int?
+  branchesID         Int?
   departmentNameID   Int?
   designationID      Int?
   managerID          Int?
@@ -548,17 +585,21 @@ model EmpPromotion {
   salaryPayGradeType String?      @db.VarChar
   monthlyPayGradeID  Int?
   hourlyPayGradeID   Int?
-  departments        Departments? @relation(fields: [departmentNameID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  leavePolicy        leavePolicy? @relation(fields: [leavePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  workShift    WorkShift?    @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  designations Designations? @relation(fields: [designationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
+  promotedSalaryCtc  Int?
+  description        String?      @db.VarChar
+  promotionDate      DateTime?    @db.Date
+  status             String?      @db.VarChar
+  serviceProvider  ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company          Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches         Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  departments      Departments?     @relation(fields: [departmentNameID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  designations     Designations?    @relation(fields: [designationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  workShift        WorkShift?       @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   attendancePolicy AttendancePolicy? @relation(fields: [attendancePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  hourlyPayGrade  HourlyPayGrade?  @relation(fields: [hourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  monthlyPayGrade MonthlyPayGrade? @relation(fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  manageEmployee  ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  leavePolicy      leavePolicy?     @relation(fields: [leavePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hourlyPayGrade   HourlyPayGrade?  @relation(fields: [hourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  monthlyPayGrade  MonthlyPayGrade? @relation(fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee   ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([manageEmployeeID])
 }
@@ -638,6 +679,7 @@ model MonthlyPayGrade {
   promotionRequest_promotionRequest_currentMonthlyPayGradeIDTomonthlyPayGrade  PromotionRequest[]             @relation("promotionRequest_currentMonthlyPayGradeIDTomonthlyPayGrade")
   promotionRequest_promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade PromotionRequest[]             @relation("promotionRequest_proposedMonthlyPayGradeIDTomonthlyPayGrade")
   empPromotion                                                                 EmpPromotion[]
+  manageEmployees                                                              ManageEmployee[]               @relation("EmployeeMonthlyPayGrade")
 }
 
 model MonthlyPayGradeAllowanceList {
@@ -737,6 +779,7 @@ model ServiceProvider {
   empAttendanceRegularise      EmpAttendanceRegularise[]
   empCurrentPosition           EmpCurrentPosition[]
   empFieldSiteAttendance       EmpFieldSiteAttendance[]
+  empPromotion                 EmpPromotion[]
   genarateBonus                GenarateBonus[]
   hourlyPayGrade               HourlyPayGrade[]
   leaveApplication             leaveApplication[]
@@ -764,6 +807,7 @@ model WorkShift {
   workShiftName     String?          @db.VarChar
   isActive          String?          @db.VarChar
   empPromotion      EmpPromotion[]
+  manageEmployees   ManageEmployee[] @relation("EmployeeWorkShift")
   branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)

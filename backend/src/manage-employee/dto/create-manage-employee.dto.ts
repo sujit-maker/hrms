@@ -77,6 +77,20 @@ export class CreateManageEmployeeDto {
   @IsOptional() @IsString() employeeMotherName?: string;
   @IsOptional() @IsString() employeeSpouseName?: string;
 
+  // Basic position fields (stored directly on ManageEmployee)
+  @IsOptional() @IsInt() departmentNameID?: number;
+  @IsOptional() @IsInt() designationID?: number;
+  @IsOptional() @IsInt() managerID?: number;
+  @IsOptional() @IsString() employmentType?: string;
+  @IsOptional() @IsString() employmentStatus?: string;
+  @IsOptional() @IsString() probationPeriod?: string;
+  @IsOptional() @IsInt() workShiftID?: number;
+  @IsOptional() @IsInt() attendancePolicyID?: number;
+  @IsOptional() @IsInt() leavePolicyID?: number;
+  @IsOptional() @IsString() salaryPayGradeType?: string;
+  @IsOptional() @IsInt() monthlyPayGradeID?: number;
+  @IsOptional() @IsInt() hourlyPayGradeID?: number;
+
   // Nested arrays
   @IsOptional() @IsArray()
   @ValidateNested({ each: true })
