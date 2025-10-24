@@ -15,5 +15,5 @@ export class CreateDesignationsDto {
 
   @IsOptional()
   @IsString()
-  designantion?: string; // typo preserved from schema
+  desgination?: string; // typo preserved from schema
 }

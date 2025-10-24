@@ -1,10 +1,12 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../../node_modules/@prisma/client-hrms"
 }
+
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL_HRMS")
 }
 
 model AttendancePolicy {
@@ -17,7 +19,11 @@ model AttendancePolicy {
   checkin_begin_before_min    Int?
   checkout_end_after_min      Int?
   checkin_grace_time_min      Int?
+  earlyCheckoutBeforeEndMin   Int?
   min_work_hours_half_day_min Int?
+  max_late_check_in_time        Int?
+   markAs  String?
+  lateMarkCount  String?
   allow_self_mark_attendance  Boolean?         @default(false)
   allow_manager_update_ot     Boolean?         @default(false)
   max_ot_hours_per_day_min    Int?
@@ -52,10 +58,12 @@ model BonusSetup {
   serviceProviderID Int?
   companyID         Int?
   branchesID        Int?
-  BonusName         String?          @db.VarChar
+  bonusName         String?          @db.VarChar
+  bonusType         String?          @db.VarChar
   bonusDescription  String?          @db.VarChar
   bonusBasedOn      String?          @db.VarChar
   bonusPercentage   String?          @db.VarChar
+  bonusFixed        String?          @db.VarChar
   branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -116,13 +124,17 @@ model Branches {
   manageEmployee               ManageEmployee[]
   manageHoliday                ManageHoliday[]
   monthlyPayGrade              MonthlyPayGrade[]
- 
+   salaryAdvance          SalaryAdvance[]
+   reimbursement          Reimbursement[]
+
   publicHoliday                PublicHoliday[]
   salaryAllowance              SalaryAllowance[]
   salaryCycle                  SalaryCycle[]
   salaryDeduction              SalaryDeduction[]
   workShift                    WorkShift[]
   devices                      Devices[]
+    generateSalary          GenerateSalary[]
+
 }
 
 model Company {
@@ -153,6 +165,7 @@ model Company {
   serviceProvider              ServiceProvider?               @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   contractors                  Contractors[]
   departments                  Departments[]
+    salaryAdvance          SalaryAdvance[]
   designations                 Designations[]
   empAttendanceRegularise      EmpAttendanceRegularise[]
   empCurrentPosition           EmpCurrentPosition[]
@@ -174,6 +187,8 @@ model Company {
   salaryDeduction              SalaryDeduction[]
   workShift                    WorkShift[]
   devices                      Devices[]
+  generateSalary          GenerateSalary[]
+  reimbursement          Reimbursement[]
 }
 
 model Contractors {
@@ -215,6 +230,7 @@ model Departments {
   serviceProvider                                                     ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   empCurrentPosition                                                  EmpCurrentPosition[]
   empPromotion                                                        EmpPromotion[]
+  
   manageEmployees                                                     ManageEmployee[]     @relation("EmployeeDepartment")
   promotionRequest_promotionRequest_currentDepartmentIDTodepartments  PromotionRequest[]   @relation("promotionRequest_currentDepartmentIDTodepartments")
   promotionRequest_promotionRequest_proposedDepartmentIDTodepartments PromotionRequest[]   @relation("promotionRequest_proposedDepartmentIDTodepartments")
@@ -225,7 +241,7 @@ model Designations {
   serviceProviderID                                                     Int?
   companyID                                                             Int?
   branchesID                                                            Int?
-  designantion                                                          String?              @db.VarChar
+  desgination                                                         String?              @db.VarChar
   branches                                                              Branches?            @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company                                                               Company?             @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider                                                       ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -254,7 +270,7 @@ model Devices {
   deviceName  String @db.VarChar
   deviceMake  String @db.VarChar
   deviceModel String @db.VarChar
-deviceSN String @db.VarChar @unique
+  deviceSN String @db.VarChar @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -289,6 +305,7 @@ model EmpAttendanceRegularise {
   branchesID        Int?
   manageEmployeeID  Int?
   attendanceDate    DateTime?        @db.Date
+  day               String? 
   checkInTime       DateTime?        @db.Timestamp(6)
   checkOutTime      DateTime?        @db.Timestamp(6)
   remarks           String?          @db.VarChar
@@ -550,7 +567,7 @@ model ManageEmployee {
   company                 Company?                  @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   contractors             Contractors?              @relation(fields: [contractorID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider         ServiceProvider?          @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
+  salaryAdvance          SalaryAdvance[]
   // Relations for basic position fields
   departments             Departments?              @relation("EmployeeDepartment", fields: [departmentNameID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   designations            Designations?             @relation("EmployeeDesignation", fields: [designationID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -561,10 +578,11 @@ model ManageEmployee {
   leavePolicy             leavePolicy?              @relation("EmployeeLeavePolicy", fields: [leavePolicyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   monthlyPayGrade         MonthlyPayGrade?          @relation("EmployeeMonthlyPayGrade", fields: [monthlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   hourlyPayGrade          HourlyPayGrade?           @relation("EmployeeHourlyPayGrade", fields: [hourlyPayGradeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
+  generateSalary          GenerateSalary[]
   promotionRequest        PromotionRequest[]
   empPromotion            EmpPromotion[]
   bonusAllocation         BonusAllocation[]
+  reimbursement          Reimbursement[]
 }
 
 model EmpPromotion {
@@ -742,6 +760,21 @@ model SalaryCycle {
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
+model  GenerateSalary{
+  id Int @id @default(autoincrement())
+  serviceProviderID Int?
+  companyID         Int?
+  branchesID        Int?
+  employeeID Int
+  monthPeriod  String
+    markAs  String?
+  lateMarkCount  String?
+  manageEmployee  ManageEmployee?  @relation(fields: [employeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+   branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
 model SalaryDeduction {
   id                           Int                            @id @default(autoincrement())
   serviceProviderID            Int?
@@ -773,6 +806,7 @@ model ServiceProvider {
   bonusSetup                   BonusSetup[]
   branches                     Branches[]
   company                      Company[]
+    salaryAdvance          SalaryAdvance[]
   contractors                  Contractors[]
   departments                  Departments[]
   designations                 Designations[]
@@ -795,6 +829,8 @@ model ServiceProvider {
   salaryDeduction              SalaryDeduction[]
   workShift                    WorkShift[]
   devices                      Devices[]
+  generateSalary               GenerateSalary[]
+  reimbursement                 Reimbursement[]
   created_at                   DateTime?                      @db.Timestamp(6)
   updated_at                   DateTime?                      @db.Timestamp(6)
 }
@@ -819,8 +855,8 @@ model WorkShiftDay {
   workShiftID  Int?
   weekDay      String?    @db.VarChar
   weeklyOff    Boolean?
-  startTime    DateTime?  @db.Time(6)
-  endTime      DateTime?  @db.Time(6)
+  startTime    String?
+  endTime      String?
   totalMinutes Int?
   workShift    WorkShift? @relation(fields: [workShiftID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
@@ -858,3 +894,67 @@ model HolidayOnDay {
 
   @@unique([calendarDayId, holidayId])
 }
+
+model SalaryAdvance{
+  id Int @id @default(autoincrement())
+  
+  serviceProviderID Int?
+  companyID         Int?
+  branchesID        Int?
+  manageEmployeeID  Int?
+  previousAdvancesDue  String?
+  advanceAmount     String?
+  reason            String?
+  status            String? @default("Pending") 
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  salaryAdvanceRepayment SalaryAdvanceRepayment[]
+  branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+
+model SalaryAdvanceRepayment {
+  id              Int       @id @default(autoincrement())
+  salaryAdvanceID Int
+  approvedAmount  String    
+  startMonth      DateTime? 
+  amount          String?    // For Manual entry
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  salaryAdvance   SalaryAdvance @relation(fields: [salaryAdvanceID], references: [id], onDelete: Cascade)
+}
+
+model Reimbursement {
+  id                Int              @id @default(autoincrement())
+  serviceProviderID Int?
+  companyID         Int?
+  branchesID        Int?
+  manageEmployeeID  Int?
+  date              String?
+  reimbursementType String?
+  amount            String?
+  description       String?
+  status            String?          @default("Pending")
+
+  // 🔽 NEW: items linked to a single reimbursement
+  items             ReimbursementItem[]
+
+  branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  manageEmployee    ManageEmployee?  @relation(fields: [manageEmployeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model ReimbursementItem {
+  id               Int    @id @default(autoincrement())
+  reimbursementID  Int
+  reimbursementType String?
+  amount            String?
+  description       String?
+
+  reimbursement    Reimbursement @relation(fields: [reimbursementID], references: [id], onDelete: Cascade)
+}
+

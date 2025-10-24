@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
 import { CreateBankDetailsDto } from './dto/create-bank-detail.dto';
 import { UpdateBankDetailsDto } from './dto/update-bank-detail.dto';
+import { Prisma } from '@prisma/client-hrms';
 
 @Injectable()
 export class BankDetailsService {

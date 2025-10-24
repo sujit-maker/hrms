@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client-hrms';
 import { CreateEmpCurrentPositionDto } from './dto/create-emp-current-position.dto';
 import { UpdateEmpCurrentPositionDto } from './dto/update-emp-current-position.dto';
 

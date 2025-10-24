@@ -12,9 +12,16 @@ export class CreateAttendancePolicyDto {
   @IsOptional() @IsInt() checkout_end_after_min?: number;
   @IsOptional() @IsInt() checkin_grace_time_min?: number;
   @IsOptional() @IsInt() min_work_hours_half_day_min?: number;
+  @IsOptional() @IsInt() max_late_check_in_time?:number;
+  @IsOptional()@IsInt() earlyCheckoutBeforeEndMin?:number;
 
   @IsOptional() @IsBoolean() allow_self_mark_attendance?: boolean;
   @IsOptional() @IsBoolean() allow_manager_update_ot?: boolean;
+    @IsString()
+    markAs: string;
+  
+    @IsString()
+    lateMarkCount: string;
 
   @IsOptional() @IsInt() max_ot_hours_per_day_min?: number;
 }

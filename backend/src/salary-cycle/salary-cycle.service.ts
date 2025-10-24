@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateSalaryCycleDto } from './dto/create-salary-cycle.dto';
 import { UpdateSalaryCycleDto } from './dto/update-salary-cycle.dto';
+import { FindSalaryCycleQueryDto } from './dto/find-salary-cycle.query.dto';
 
 @Injectable()
 export class SalaryCycleService {
@@ -34,6 +35,15 @@ export class SalaryCycleService {
       orderBy: { id: 'desc' },
     });
   }
+
+   async findByCompany(companyID: number) {
+    return this.prisma.salaryCycle.findMany({
+      where: { companyID },
+      include: this.includeRels(),
+      orderBy: { id: 'desc' },
+    });
+  }
+
 
   async findOne(id: number) {
     const rec = await this.prisma.salaryCycle.findUnique({

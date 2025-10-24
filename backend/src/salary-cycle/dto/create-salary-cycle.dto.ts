@@ -16,4 +16,9 @@ export class CreateSalaryCycleDto {
 
   @IsOptional() @IsString() @MaxLength(2)
   monthStartDay?: string;
+  
+   @IsOptional()
+  latest?: '1' | 'true';
+
+
 }

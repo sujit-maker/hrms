@@ -12,7 +12,10 @@ export class CreateBonusSetupDto {
   branchesID?: number;
 
   @IsOptional() @IsString() @MaxLength(255)
-  BonusName?: string;
+  bonusName?: string;
+
+  @IsOptional() @IsString() @MaxLength(255)
+  bonusType?:string;
 
   @IsOptional() @IsString() @MaxLength(500)
   bonusDescription?: string;
@@ -22,4 +25,7 @@ export class CreateBonusSetupDto {
 
   @IsOptional() @IsString() @MaxLength(50)
   bonusPercentage?: string;
+
+  @IsOptional() @IsString() 
+  bonusFixed?:string
 }

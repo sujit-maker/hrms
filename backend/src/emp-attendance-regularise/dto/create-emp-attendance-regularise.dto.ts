@@ -22,6 +22,10 @@ export class CreateEmpAttendanceRegulariseDto {
   attendanceDate?: string;
 
   @IsOptional()
+  @IsString()
+  day?:string;
+
+  @IsOptional()
   @IsDateString()
   checkInTime?: string;
 

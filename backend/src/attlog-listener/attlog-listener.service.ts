@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Prisma, DeviceStatus } from '@prisma/client';
+import { Prisma, DeviceStatus } from '@prisma/client-hrms';
 
 @Injectable()
 export class AttlogListenerService {

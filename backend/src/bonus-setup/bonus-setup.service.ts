@@ -23,11 +23,12 @@ export class BonusSetupService {
         serviceProviderID: dto.serviceProviderID ?? null,
         companyID: dto.companyID ?? null,
         branchesID: dto.branchesID ?? null,
-        // Note: Prisma expects exact field names as in schema
-        BonusName: dto.BonusName ?? null,
+        bonusName: dto.bonusName ?? null,
+        bonusType:dto.bonusType ?? null,
         bonusDescription: dto.bonusDescription ?? null,
         bonusBasedOn: dto.bonusBasedOn ?? null,
         bonusPercentage: dto.bonusPercentage ?? null,
+        bonusFixed: dto.bonusFixed ?? null,
       },
       include: this.includeRels(),
     });
@@ -58,10 +59,12 @@ export class BonusSetupService {
         serviceProviderID: dto.serviceProviderID ?? undefined,
         companyID: dto.companyID ?? undefined,
         branchesID: dto.branchesID ?? undefined,
-        BonusName: dto.BonusName ?? undefined,
+        bonusName: dto.bonusName ?? undefined,
+        bonusType:dto.bonusType ?? undefined,
         bonusDescription: dto.bonusDescription ?? undefined,
         bonusBasedOn: dto.bonusBasedOn ?? undefined,
         bonusPercentage: dto.bonusPercentage ?? undefined,
+        bonusFixed: dto.bonusFixed ?? undefined,
       },
       include: this.includeRels(),
     });

@@ -7,6 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "migrate:dev": "prisma migrate dev --schema=prisma/hrms/schema.prisma",
+  "generate": "prisma generate --schema=prisma/hrms/schema.prisma",
     "seed": "ts-node prisma/seed.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

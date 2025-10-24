@@ -87,12 +87,30 @@ export function WorkShiftsManagement() {
     branchesID: undefined as number | undefined,
     weeklySchedule: DAYS_OF_WEEK.map((day) => ({
       day,
-      startTime: "09:00",
+      startTime: "10:00",
       endTime: "18:00",
       totalHours: 8,
       isWeeklyOff: false, 
     })),
   });
+
+  // Utility to format Prisma Date/Time into "HH:mm"
+// Utility to normalize DB/form time into "HH:mm"
+const formatDbTime = (value: string | Date | null | undefined): string => {
+  if (!value) return "";
+
+  // Already "HH:mm"
+  if (typeof value === "string" && /^\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
+
+  // Try parsing as Date
+  const d = new Date(value as any);
+  if (isNaN(d.getTime())) return "";
+
+  // Force to UTC time string
+  return d.toISOString().substring(11, 16); // "HH:mm"
+};
 
   // API functions for search and suggest
   // Use absolute URLs to backend (port 8000) and filter client-side by display fields
@@ -154,12 +172,13 @@ export function WorkShiftsManagement() {
     loadWorkShifts();
   }, []);
 
-  const loadWorkShifts = async () => {
+   const loadWorkShifts = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/work-shift`, {
         cache: "no-store",
       });
       const data = await res.json();
+
       const workShiftsData = (Array.isArray(data) ? data : []).map(
         (shift: any) => ({
           id: shift.id.toString(),
@@ -170,37 +189,36 @@ export function WorkShiftsManagement() {
           companyName: shift.company?.companyName || "",
           branchName: shift.branches?.branchName || "",
           workShiftName: shift.workShiftName,
-          weeklySchedule:
-            shift.workShiftDay?.map((day: any) => ({
-              day: day.weekDay,
-              startTime: day.startTime
-                ? new Date(day.startTime).toTimeString().slice(0, 5)
-                : "09:00",
-              endTime: day.endTime
-                ? new Date(day.endTime).toTimeString().slice(0, 5)
-                : "18:00",
-              totalHours: day.totalMinutes
-                ? Math.round((day.totalMinutes / 60) * 10) / 10
-                : 8,
-              isWeeklyOff: day.weeklyOff || false,
-            })) ||
-            DAYS_OF_WEEK.map((day) => ({
-      day,
-      startTime: "09:00",
-      endTime: "18:00",
-      totalHours: 8,
-              isWeeklyOff: false,
-            })),
+         weeklySchedule:
+  shift.workShiftDay?.map((day: any) => ({
+    day: day.weekDay,
+    startTime: formatDbTime(day.startTime) || "10:00",
+    endTime: formatDbTime(day.endTime) || "18:00",
+    totalHours: day.totalMinutes
+      ? Math.round((day.totalMinutes / 60) * 10) / 10
+      : 8,
+    isWeeklyOff: day.weeklyOff || false,
+  })) ||
+  DAYS_OF_WEEK.map((day) => ({
+    day,
+    startTime: "10:00",
+    endTime: "18:00",
+    totalHours: 8,
+    isWeeklyOff: false,
+  })),
+
           createdAt: shift.createdAt
             ? new Date(shift.createdAt).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
         })
       );
+
       setWorkShifts(workShiftsData);
     } catch (error) {
       console.error("Error loading work shifts:", error);
     }
   };
+
 
   const filteredWorkShifts = workShifts.filter(
     (workShift) =>
@@ -264,8 +282,6 @@ export function WorkShiftsManagement() {
     updatedSchedule[dayIndex] = {
       ...updatedSchedule[dayIndex],
       isWeeklyOff,
-      startTime: isWeeklyOff ? "00:00" : updatedSchedule[dayIndex].startTime,
-      endTime: isWeeklyOff ? "00:00" : updatedSchedule[dayIndex].endTime,
       totalHours: isWeeklyOff ? 0 : updatedSchedule[dayIndex].totalHours,
     };
     
@@ -275,22 +291,27 @@ export function WorkShiftsManagement() {
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      // Convert hours to minutes for backend
-      const workShiftDays = formData.weeklySchedule.map((day) => ({
-        weekDay: day.day,
-        weeklyOff: day.isWeeklyOff,
-        startTime: day.isWeeklyOff
-          ? null
-          : new Date(`2000-01-01T${day.startTime}:00`),
-        endTime: day.isWeeklyOff
-          ? null
-          : new Date(`2000-01-01T${day.endTime}:00`),
-        totalMinutes: day.isWeeklyOff ? 0 : Math.round(day.totalHours * 60),
-      }));
+ // Convert "HH:mm" → Date at UTC with today's date
+const toDateTime = (time: string) => {
+  const [h, m] = time.split(":").map(Number);
+  const now = new Date();
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0));
+};
+
+
+
+     const workShiftDays = formData.weeklySchedule.map((day) => ({
+  weekDay: day.day,
+  weeklyOff: day.isWeeklyOff,
+  startTime: day.isWeeklyOff ? null : toDateTime(day.startTime),
+  endTime: day.isWeeklyOff ? null : toDateTime(day.endTime),
+  totalMinutes: day.isWeeklyOff ? 0 : Math.round(day.totalHours * 60),
+}));
+
 
       const workShiftData = {
         serviceProviderID: formData.serviceProviderID,
@@ -320,9 +341,10 @@ export function WorkShiftsManagement() {
       setIsDialogOpen(false);
     } catch (error) {
       console.error("Error saving work shift:", error);
-      // You might want to show an error message to the user here
+      // show error message if needed
     }
   };
+
 
   const resetForm = () => {
     setFormData({
@@ -335,7 +357,7 @@ export function WorkShiftsManagement() {
       branchesID: undefined,
       weeklySchedule: DAYS_OF_WEEK.map((day) => ({
         day,
-        startTime: "09:00",
+        startTime: "10:00",
         endTime: "18:00",
         totalHours: 8,
         isWeeklyOff: false,
@@ -369,19 +391,23 @@ export function WorkShiftsManagement() {
   };
 
   const handleEdit = (workShift: WorkShift) => {
-    setFormData({
-      serviceProvider: workShift.serviceProvider || "",
-      companyName: workShift.companyName || "",
-      branchName: workShift.branchName || "",
-      workShiftName: workShift.workShiftName,
-      serviceProviderID: workShift.serviceProviderID,
-      companyID: workShift.companyID,
-      branchesID: workShift.branchesID,
-      weeklySchedule: workShift.weeklySchedule,
-    });
-    setEditingWorkShift(workShift);
-    setIsDialogOpen(true);
-  };
+  setFormData({
+    serviceProvider: workShift.serviceProvider || "",
+    companyName: workShift.companyName || "",
+    branchName: workShift.branchName || "",
+    workShiftName: workShift.workShiftName,
+    serviceProviderID: workShift.serviceProviderID,
+    companyID: workShift.companyID,
+    branchesID: workShift.branchesID,
+    weeklySchedule: workShift.weeklySchedule.map((day) => ({
+      ...day,
+      startTime: formatDbTime(day.startTime) || "10:00",
+      endTime: formatDbTime(day.endTime) || "18:00",
+    })),
+  });
+  setEditingWorkShift(workShift);
+  setIsDialogOpen(true);
+};
 
   const handleDelete = async (id: string) => {
     try {
@@ -669,13 +695,12 @@ export function WorkShiftsManagement() {
                         return sum + day.totalHours;
                       }, 0);
                     
-                    const scheduleSummary = workShift.weeklySchedule
-                      .filter((day) => !day.isWeeklyOff)
-                      .map(
-                        (day) => `${day.day}: ${day.startTime}-${day.endTime}`
-                      )
-                      .join(", ");
-                    
+                 const scheduleSummary = workShift.weeklySchedule
+  .filter((day) => !day.isWeeklyOff)
+  .map((day) => `${day.day}: ${formatDbTime(day.startTime)}-${formatDbTime(day.endTime)}`)
+  .join(", ");
+
+
                     return (
                       <TableRow key={workShift.id}>
                         <TableCell className="whitespace-nowrap">

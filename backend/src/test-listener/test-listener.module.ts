@@ -7,4 +7,4 @@ import { PrismaService } from 'src/prisma/prisma.service';
   controllers: [TestListenerController],
   providers: [TestListenerService, PrismaService],
 })
-export class TestListenerModule {}
+export class RawListenerModule {}

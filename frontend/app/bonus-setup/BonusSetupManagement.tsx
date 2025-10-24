@@ -34,9 +34,12 @@ interface BonusSetupUI {
   companyName: string;
   branchName: string;
   bonusName: string;
+  bonusType: string;
   description: string;
   bonusBasedOn: "Basic" | "Gross";
   percentageOfBonus: number;
+  bonusFixed: string;
+
   createdAt: string;
 }
 
@@ -45,10 +48,12 @@ type ApiBonus = {
   serviceProviderID: number | null;
   companyID: number | null;
   branchesID: number | null;
-  BonusName: string | null;
+  bonusName: string | null;
+  bonusType: string | null;
   bonusDescription: string | null;
   bonusBasedOn: string | null;   // "Basic" | "Gross" (stored as string)
   bonusPercentage: string | null; // stored as string in DB
+  bonusFixed: string | null;
   createdAt?: string;
   serviceProvider?: { id: number; companyName?: string | null } | null;
   company?: { id: number; companyName?: string | null } | null;
@@ -86,9 +91,11 @@ export function BonusSetupManagement() {
     coAutocomplete: "",
     brAutocomplete: "",
     bonusName: "",
+    bonusType: "",
     description: "",
     bonusBasedOn: "Basic" as "Basic" | "Gross",
     percentageOfBonus: 0,
+    bonusFixed: "",
   });
 
   /* -------- click outside to close suggestion popovers -------- */
@@ -131,10 +138,12 @@ export function BonusSetupManagement() {
       serviceProvider: x.serviceProvider?.companyName ?? "-",
       companyName: x.company?.companyName ?? "-",
       branchName: x.branches?.branchName ?? "-",
-      bonusName: x.BonusName ?? "-",
+      bonusName: x.bonusName ?? "-",
+      bonusType: x.bonusType ?? "-",
       description: x.bonusDescription ?? "",
       bonusBasedOn: (x.bonusBasedOn === "Gross" ? "Gross" : "Basic") as "Basic" | "Gross",
       percentageOfBonus: safeNum(x.bonusPercentage, 0),
+      bonusFixed: x.bonusFixed ?? "",
       createdAt: x.createdAt ? x.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
     };
   }
@@ -144,10 +153,12 @@ export function BonusSetupManagement() {
       serviceProviderID: fd.serviceProviderID,
       companyID: fd.companyID,
       branchesID: fd.branchesID,
-      BonusName: fd.bonusName,
+      bonusName: fd.bonusName,
+      bonusType: fd.bonusType,
       bonusDescription: fd.description,
-      bonusBasedOn: fd.bonusBasedOn,           // string in DB
-      bonusPercentage: String(fd.percentageOfBonus), // DB expects string
+      bonusBasedOn: fd.bonusType === "Percentage" ? fd.bonusBasedOn : null,
+      bonusPercentage: fd.bonusType === "Percentage" ? String(fd.percentageOfBonus) : null,
+      bonusFixed: fd.bonusType === "Fixed" ? fd.bonusFixed : null,
     };
   }
 
@@ -247,9 +258,11 @@ export function BonusSetupManagement() {
       coAutocomplete: bonus.companyName || "",
       brAutocomplete: bonus.branchName || "",
       bonusName: bonus.bonusName,
+      bonusType: bonus.bonusType,
       description: bonus.description,
       bonusBasedOn: bonus.bonusBasedOn,
       percentageOfBonus: bonus.percentageOfBonus,
+      bonusFixed: bonus.bonusFixed,
     });
     setEditingBonus(bonus);
     setIsDialogOpen(true);
@@ -273,9 +286,11 @@ export function BonusSetupManagement() {
       coAutocomplete: "",
       brAutocomplete: "",
       bonusName: "",
+      bonusType: "",
       description: "",
       bonusBasedOn: "Basic",
       percentageOfBonus: 0,
+      bonusFixed: "",
     });
     setEditingBonus(null);
     setSpList([]); setCoList([]); setBrList([]);
@@ -286,11 +301,16 @@ export function BonusSetupManagement() {
     return bonuses.filter(
       (b) =>
         b.bonusName.toLowerCase().includes(q) ||
+        b.bonusType.toLowerCase().includes(q) ||
         b.serviceProvider.toLowerCase().includes(q) ||
         b.companyName.toLowerCase().includes(q) ||
         b.branchName.toLowerCase().includes(q),
     );
   }, [bonuses, searchTerm]);
+
+  // Determine which fields to show based on bonus type
+  const showFixedBonus = formData.bonusType === "Fixed";
+  const showPercentageFields = formData.bonusType === "Percentage";
 
   /* ---------------- UI ---------------- */
   return (
@@ -475,42 +495,83 @@ export function BonusSetupManagement() {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Bonus Configuration</h3>
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Bonus Type */}
                   <div className="space-y-2">
-                    <Label htmlFor="bonusBasedOn">Bonus Based On *</Label>
+                    <Label htmlFor="bonusType">Bonus Type *</Label>
                     <select
-                      id="bonusBasedOn"
-                      value={formData.bonusBasedOn}
-                      onChange={(e) => setFormData((p) => ({ ...p, bonusBasedOn: e.target.value as "Basic" | "Gross" }))}
+                      id="bonusType"
+                      value={formData.bonusType}
+                      onChange={(e) => setFormData((p) => ({ ...p, bonusType: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
-                      <option value="Basic">Basic</option>
-                      <option value="Gross">Gross</option>
+                      <option value="">Select bonus type</option>
+                      <option value="Fixed">Fixed</option>
+                      <option value="Percentage">Percentage</option>
                     </select>
-                    <p className="text-xs text-gray-500">
-                      Whether bonus is calculated on Basic salary or Gross salary
-                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="percentageOfBonus">Percentage of Bonus *</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="percentageOfBonus"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={formData.percentageOfBonus}
-                        onChange={(e) => setFormData((p) => ({ ...p, percentageOfBonus: parseFloat(e.target.value) || 0 }))}
-                        placeholder="0"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">%</span>
+
+                  {/* Fixed Bonus Value - Only show when Bonus Type is Fixed */}
+                  {showFixedBonus && (
+                    <div className="space-y-2">
+                      <Label htmlFor="bonusFixed">Fixed Bonus Value *</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="bonusFixed"
+                          type="text"
+                          value={formData.bonusFixed}
+                          onChange={(e) => setFormData((p) => ({ ...p, bonusFixed: e.target.value }))}
+                          placeholder="0"
+                          required={showFixedBonus}
+                        />
+                        <span className="text-sm text-gray-500">₹</span>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      Percentage of {formData.bonusBasedOn.toLowerCase()} salary for bonus
-                    </p>
-                  </div>
+                  )}
+
+                  {/* Bonus Based On - Only show when Bonus Type is Percentage */}
+                  {showPercentageFields && (
+                    <div className="space-y-2">
+                      <Label htmlFor="bonusBasedOn">Bonus Based On *</Label>
+                      <select
+                        id="bonusBasedOn"
+                        value={formData.bonusBasedOn}
+                        onChange={(e) => setFormData((p) => ({ ...p, bonusBasedOn: e.target.value as "Basic" | "Gross" }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required={showPercentageFields}
+                      >
+                        <option value="Basic">Basic</option>
+                        <option value="Gross">Gross</option>
+                      </select>
+                      <p className="text-xs text-gray-500">
+                        Whether bonus is calculated on Basic salary or Gross salary
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Percentage of Bonus - Only show when Bonus Type is Percentage */}
+                  {showPercentageFields && (
+                    <div className="space-y-2">
+                      <Label htmlFor="percentageOfBonus">Percentage of Bonus *</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="percentageOfBonus"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.01"
+                          value={formData.percentageOfBonus}
+                          onChange={(e) => setFormData((p) => ({ ...p, percentageOfBonus: parseFloat(e.target.value) || 0 }))}
+                          placeholder="0"
+                          required={showPercentageFields}
+                        />
+                        <span className="text-sm text-gray-500">%</span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Percentage of {formData.bonusBasedOn.toLowerCase()} salary for bonus
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

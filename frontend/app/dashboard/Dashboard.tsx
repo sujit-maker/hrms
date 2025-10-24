@@ -361,12 +361,12 @@ export function HRManagementDashboard() {
                       </SidebarMenuSubItem>
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
-                          <Link href="/hourly-pay-grade" className={`transition-all duration-200 rounded-md px-3 py-2 ${
+                          <Link href="/salary-advance" className={`transition-all duration-200 rounded-md px-3 py-2 ${
                             isActiveLink('/hourly-pay-grade') 
                               ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md' 
                               : 'text-blue-200 hover:text-white hover:bg-blue-700/50'
                           }`}>
-                            <span className="font-medium">Hourly Pay Grade</span>
+                            <span className="font-medium">Salary Advance</span>
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>

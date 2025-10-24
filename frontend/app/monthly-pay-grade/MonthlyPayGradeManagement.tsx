@@ -19,7 +19,10 @@ interface Allowance {
   name: string;
   type: "Fixed" | "Percentage";
   value: number;
+  isBonus?: boolean; // New field to identify bonus allowances
+  bonusBasedOn?: string; // For bonus allowances
 }
+
 interface Deduction {
   id: string;
   name: string;
@@ -33,12 +36,34 @@ type ApiAllowance = {
   salaryAllowanceType: string | null;
   salaryAllowanceValue: string | null;
 };
+
 type ApiDeduction = {
   id: number;
   salaryDeductionName: string | null;
   salaryDeductionType: string | null;
   salaryDeductionValue: string | null;
 };
+
+type ApiBonusAllocation = {
+  id: number;
+  bonusSetupID: number;
+  financialYear: number | null;
+  salaryPeriod: number | null;
+  employeeID: number;
+  bonusSetup?: {
+    id: number;
+    serviceProviderID: number | null;
+    companyID: number | null;
+    branchesID: number | null;
+    bonusName: string | null;
+    bonusType: string | null;
+    bonusDescription: string | null;
+    bonusBasedOn: string | null;
+    bonusPercentage: string | null;
+    bonusFixed: string | null;
+  } | null;
+};
+
 type ApiMPG = {
   id: number;
   serviceProviderID: number | null;
@@ -84,13 +109,14 @@ const API = {
   mpg: "http://localhost:8000/monthly-pay-grade",
   allowances: "http://localhost:8000/salary-allowance",
   deductions: "http://localhost:8000/salary-deduction",
+  bonusAllocations: "http://localhost:8000/bonus-allocation", // New endpoint for bonuses
   serviceProviders: "http://localhost:8000/service-provider",
   companies: "http://localhost:8000/company",
   branches: "http://localhost:8000/branches",
 };
 
 const MIN_CHARS = 1;
-const EPS = 0.5; // ₹0.50 tolerance for equality checks
+const EPS = 0.5;
 
 /* ---------- Component ---------- */
 export function MonthlyPayGradeManagement() {
@@ -102,6 +128,7 @@ export function MonthlyPayGradeManagement() {
   // fetched picklists
   const [allowanceList, setAllowanceList] = useState<Allowance[]>([]);
   const [deductionList, setDeductionList] = useState<Deduction[]>([]);
+  const [bonusList, setBonusList] = useState<Allowance[]>([]); // New state for bonus allowances
 
   // --- FK autocomplete state ---
   const [spList, setSpList] = useState<SP[]>([]);
@@ -147,25 +174,56 @@ export function MonthlyPayGradeManagement() {
   useEffect(() => {
     (async () => {
       try {
-        const [aRes, dRes, mpgRes] = await Promise.all([fetch(API.allowances), fetch(API.deductions), fetch(API.mpg)]);
-        const [aData, dData, mpgData]: [ApiAllowance[], ApiDeduction[], ApiMPG[]] = await Promise.all([
+        const [aRes, dRes, bonusRes, mpgRes] = await Promise.all([
+          fetch(API.allowances), 
+          fetch(API.deductions), 
+          fetch(API.bonusAllocations), // Fetch bonus allocations
+          fetch(API.mpg)
+        ]);
+        const [aData, dData, bonusData, mpgData]: [ApiAllowance[], ApiDeduction[], ApiBonusAllocation[], ApiMPG[]] = await Promise.all([
           aRes.json(),
           dRes.json(),
+          bonusRes.json(),
           mpgRes.json(),
         ]);
 
+        // Regular allowances
         setAllowanceList(
           aData.map((x) => ({
-            id: String(x.id),
+            id: `allowance_${x.id}`,
             name: x.salaryAllowanceName ?? "-",
             type: (x.salaryAllowanceType === "Percentage" ? "Percentage" : "Fixed") as "Fixed" | "Percentage",
             value: parseFloat(x.salaryAllowanceValue ?? "0") || 0,
+            isBonus: false,
           }))
         );
 
+        // Bonus allowances
+        const bonusAllowances: Allowance[] = bonusData
+          .filter(bonus => bonus.bonusSetup) // Only include bonuses with setup data
+          .map((bonus) => {
+            const setup = bonus.bonusSetup!;
+            const isPercentage = setup.bonusType === "Percentage";
+            const value = isPercentage 
+              ? parseFloat(setup.bonusPercentage ?? "0") || 0
+              : parseFloat(setup.bonusFixed ?? "0") || 0;
+            
+            return {
+              id: `bonus_${bonus.id}`,
+              name: setup.bonusName ?? "Unnamed Bonus",
+              type: isPercentage ? "Percentage" : "Fixed" as "Fixed" | "Percentage",
+              value: value,
+              isBonus: true,
+              bonusBasedOn: setup.bonusBasedOn ?? "Basic",
+            };
+          });
+
+        setBonusList(bonusAllowances);
+
+        // Deductions
         setDeductionList(
           dData.map((x) => ({
-            id: String(x.id),
+            id: `deduction_${x.id}`,
             name: x.salaryDeductionName ?? "-",
             type: (x.salaryDeductionType === "Percentage" ? "Percentage" : "Fixed") as "Fixed" | "Percentage",
             value: parseFloat(x.salaryDeductionValue ?? "0") || 0,
@@ -179,30 +237,41 @@ export function MonthlyPayGradeManagement() {
     })();
   }, []);
 
-  /* ---------- Derived calc ---------- */
-  // Auto-calc basic only when Salary Type is "Percentage"
-  useEffect(() => {
-    if (formData.salType === "Percentage") {
-      const basic = (formData.grossSalary * formData.percentageOfBasic) / 100;
-      setFormData((p) => ({ ...p, basicSalary: Math.round(basic) || 0 }));
-    }
-  }, [formData.grossSalary, formData.percentageOfBasic, formData.salType]);
+ /* ---------- Derived calc ---------- */
+useEffect(() => {
+  if (formData.salType === "Percentage") {
+    const basic = (formData.grossSalary * formData.percentageOfBasic) / 100;
+    setFormData((p) => ({ ...p, basicSalary: Math.round(basic * 100) / 100 || 0 }));
+  }
+}, [formData.grossSalary, formData.percentageOfBasic, formData.salType]);
 
   /* ---------- Totals (live) ---------- */
-  const allowanceTotal = useMemo(() => {
-    // Allowance % is applied on BASIC
-    return formData.selectedAllowances.reduce((sum, a) => {
-      const add = a.type === "Percentage" ? (formData.basicSalary * a.value) / 100 : a.value;
-      return sum + add;
-    }, 0);
-  }, [formData.selectedAllowances, formData.basicSalary]);
+ /* ---------- Totals (live) ---------- */
+const allowanceTotal = useMemo(() => {
+  return formData.selectedAllowances.reduce((sum, a) => {
+    // For regular allowances: Percentage is applied on Basic, Fixed is added directly
+    // For bonus allowances: Apply percentage on the appropriate base (Basic/Gross)
+    
+    let baseAmount = formData.basicSalary;
+    
+    if (a.isBonus) {
+      // Bonus allowances use Gross as base if bonusBasedOn is "Gross"
+      baseAmount = a.bonusBasedOn === "Gross" ? formData.grossSalary : formData.basicSalary;
+    } else {
+      // Regular allowances always use Basic as base for percentage calculation
+      baseAmount = formData.basicSalary;
+    }
+    
+    const add = a.type === "Percentage" ? (baseAmount * a.value) / 100 : a.value;
+    return sum + add;
+  }, 0);
+}, [formData.selectedAllowances, formData.basicSalary, formData.grossSalary]);
 
-  const expectedGrossFromBasicPlusAllowances = useMemo(() => {
-    return Math.round((formData.basicSalary + allowanceTotal) * 100) / 100;
-  }, [formData.basicSalary, allowanceTotal]);
+const expectedGrossFromBasicPlusAllowances = useMemo(() => {
+  return Math.round((formData.basicSalary + allowanceTotal) * 100) / 100;
+}, [formData.basicSalary, allowanceTotal]);
 
   const deductionTotal = useMemo(() => {
-    // Deduction % is applied on GROSS (adjust to Basic if your policy needs)
     return formData.selectedDeductions.reduce((sum, d) => {
       const add = d.type === "Percentage" ? (formData.grossSalary * d.value) / 100 : d.value;
       return sum + add;
@@ -228,17 +297,18 @@ export function MonthlyPayGradeManagement() {
       .map((row) => row.salaryAllowance)
       .filter(Boolean)
       .map((a) => ({
-        id: String(a!.id),
+        id: `allowance_${a!.id}`,
         name: a!.salaryAllowanceName ?? "-",
         type: (a!.salaryAllowanceType === "Percentage" ? "Percentage" : "Fixed") as "Fixed" | "Percentage",
         value: safeParseNum(a!.salaryAllowanceValue, 0),
+        isBonus: false,
       }));
 
     const deductions: Deduction[] = x.monthlyPayGradeDeductionList
       .map((row) => row.salaryDeduction)
       .filter(Boolean)
       .map((d) => ({
-        id: String(d!.id),
+        id: `deduction_${d!.id}`,
         name: d!.salaryDeductionName ?? "-",
         type: (d!.salaryDeductionType === "Percentage" ? "Percentage" : "Fixed") as "Fixed" | "Percentage",
         value: safeParseNum(d!.salaryDeductionValue, 0),
@@ -264,17 +334,27 @@ export function MonthlyPayGradeManagement() {
   }
 
   function mapUiToPayload(fd: typeof formData) {
+    // Separate regular allowances and bonuses
+    const regularAllowanceIDs = fd.selectedAllowances
+      .filter(a => !a.isBonus)
+      .map(a => Number(a.id.replace('allowance_', '')));
+    
+    const bonusAllowanceIDs = fd.selectedAllowances
+      .filter(a => a.isBonus)
+      .map(a => Number(a.id.replace('bonus_', '')));
+
     return {
       serviceProviderID: fd.serviceProviderID,
       companyID: fd.companyID,
       branchesID: fd.branchesID,
       monthlyPayGradeName: fd.monthlyPayGradeName,
-      salType: fd.salType, // <-- keep posting Salary Type
+      salType: fd.salType,
       grossSalary: String(fd.grossSalary),
       percentageOfBasic: fd.salType === "Percentage" ? String(fd.percentageOfBasic) : "0",
       basicSalary: fd.basicSalary,
-      allowanceIDs: fd.selectedAllowances.map((a) => Number(a.id)),
-      deductionIDs: fd.selectedDeductions.map((d) => Number(d.id)),
+      allowanceIDs: regularAllowanceIDs,
+      bonusAllocationIDs: bonusAllowanceIDs, // New field for bonus allocations
+      deductionIDs: fd.selectedDeductions.map((d) => Number(d.id.replace('deduction_', ''))),
     };
   }
 
@@ -340,7 +420,6 @@ export function MonthlyPayGradeManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation A: Gross must equal Basic + Selected Allowances
     const mismatch = Math.abs(formData.grossSalary - expectedGrossFromBasicPlusAllowances) > EPS;
     if (mismatch) {
       alert(
@@ -351,7 +430,6 @@ export function MonthlyPayGradeManagement() {
       return;
     }
 
-    // Validation B: Total deductions must be > 0 (cannot be zero or negative)
     if (deductionTotal <= 0) {
       alert(`Total deductions must be greater than 0.`);
       return;
@@ -464,6 +542,9 @@ export function MonthlyPayGradeManagement() {
     );
   }, [payGrades, searchTerm]);
 
+  // Combine regular allowances and bonuses for display
+  const allAllowances = [...allowanceList, ...bonusList];
+
   /* ---------- UI ---------- */
   return (
     <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
@@ -491,7 +572,7 @@ export function MonthlyPayGradeManagement() {
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* --- Basic Information with AUTOCOMPLETE --- */}
+              {/* Basic Information with AUTOCOMPLETE */}
               <div className="grid grid-cols-3 gap-4">
                 {/* Service Provider */}
                 <div ref={spRef} className="space-y-2 relative">
@@ -632,56 +713,39 @@ export function MonthlyPayGradeManagement() {
                 />
               </div>
 
-              {/* Salary Config (no derived displays here) */}
+              {/* Salary Config */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Salary Configuration</h3>
 
-                {/* Salary Type */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="salType">Salary Type *</Label>
-                    <select
-                      id="salType"
-                      value={formData.salType}
-                      onChange={(e) => {
-                        const val = e.target.value === "Fixed" ? "Fixed" : "Percentage";
-                        setFormData((p) => ({ ...p, salType: val }));
-                      }}
-                      className="w-full border rounded-md px-3 py-2"
-                    >
-                      <option value="Percentage">Percentage</option>
-                      <option value="Fixed">Fixed </option>
-                    </select>
-                   
+                <div className="space-y-2">
+                  <Label htmlFor="grossSalary">Gross Salary *</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="grossSalary"
+                      type="text"
+                      min="0"
+                      step="0.01"
+                      value={formData.grossSalary}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, grossSalary: parseFloat(e.target.value) || 0 }))
+                      }
+                      placeholder="0"
+                      required
+                    />
+                    <span className="text-sm text-gray-500">₹</span>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="grossSalary">Gross Salary *</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="grossSalary"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.grossSalary}
-                        onChange={(e) =>
-                          setFormData((p) => ({ ...p, grossSalary: parseFloat(e.target.value) || 0 }))
-                        }
-                        placeholder="0"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">₹</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
+                <div className="flex flex-wrap items-end gap-4">
+                  {/* Percentage of Basic */}
+                  <div className="space-y-2 flex-1 min-w-[150px]">
                     <Label htmlFor="percentageOfBasic">
                       % Of Basic {formData.salType === "Fixed" && "(disabled in Fixed)"}
                     </Label>
                     <div className="flex items-center gap-2">
                       <Input
                         id="percentageOfBasic"
-                        type="number"
+                        type="text"
                         min="0"
                         max="100"
                         step="0.01"
@@ -696,10 +760,26 @@ export function MonthlyPayGradeManagement() {
                       <span className="text-sm text-gray-500">%</span>
                     </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
+                  {/* Salary Type */}
+                  <div className="space-y-2 flex-1 min-w-[150px]">
+                    <Label htmlFor="salType">Select Type *</Label>
+                    <select
+                      id="salType"
+                      value={formData.salType}
+                      onChange={(e) => {
+                        const val = e.target.value === "Fixed" ? "Fixed" : "Percentage";
+                        setFormData((p) => ({ ...p, salType: val }));
+                      }}
+                      className="w-full border rounded-md px-3 py-2"
+                    >
+                      <option value="Percentage">Percentage</option>
+                      <option value="Fixed">Fixed </option>
+                    </select>
+                  </div>
+
+                  {/* Basic Salary */}
+                  <div className="space-y-2 flex-1 min-w-[200px]">
                     <Label htmlFor="basicSalary">
                       Basic Salary {formData.salType === "Percentage" ? "(Calculated)" : "(Editable)"}
                     </Label>
@@ -720,64 +800,131 @@ export function MonthlyPayGradeManagement() {
                       />
                       <span className="text-sm text-gray-500">₹</span>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      {formData.salType === "Percentage"
-                        ? "Auto-calculated from Gross × % Of Basic"
-                        : "Enter the Basic amount manually"}
-                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Allowance Selection */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Allowance Selection</h3>
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <p className="text-sm text-gray-600 mb-4">Select allowances for this pay grade:</p>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {allowanceList.map((allowance) => {
-                      const isSelected = formData.selectedAllowances.some((a) => a.id === allowance.id);
-                      return (
-                        <div key={allowance.id} className="flex items-center space-x-3 p-2 hover:bg-gray-100 rounded">
-                          <input
-                            type="checkbox"
-                            id={`allowance-${allowance.id}`}
-                            checked={isSelected}
-                            onChange={() => handleAllowanceToggle(allowance)}
-                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                          />
-                          <div className="flex-1">
-                            <Label htmlFor={`allowance-${allowance.id}`} className="font-medium cursor-pointer">
-                              {allowance.name}
-                            </Label>
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <span>
-                                {allowance.type === "Percentage"
-                                  ? `${allowance.value}% of Basic`
-                                  : `₹${allowance.value}`}
-                              </span>
-                              <Badge variant="outline" className="text-xs">{allowance.type}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 pt-3 border-t flex items-center justify-between">
-                    <p className="text-sm text-gray-600">
-                      Selected: {formData.selectedAllowances.length} allowance(s)
-                    </p>
-                    {/* LIVE derived gross shown here (moved from Salary Config) */}
-                    <p className="text-sm">
-                      Basic + Selected Allowances:{" "}
-                      <span className="font-semibold">₹{expectedGrossFromBasicPlusAllowances.toFixed(2)}</span>
-                      {!grossMatchesDerived && (
-                        <span className="text-red-600 ml-2">← doesn’t match Gross</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
+             {/* Allowance Selection */}
+<div className="space-y-4">
+  <h3 className="text-lg font-semibold">Allowance Selection</h3>
+  <div className="border rounded-lg p-4 bg-gray-50">
+    <p className="text-sm text-gray-600 mb-4">Select allowances and bonuses for this pay grade:</p>
+    <div className="space-y-2 max-h-60 overflow-y-auto">
+      {allAllowances.map((allowance) => {
+        const isSelected = formData.selectedAllowances.some((a) => a.id === allowance.id);
+        const isBonus = allowance.isBonus;
+        
+        // Calculate individual allowance amount for display
+        let baseAmount = formData.basicSalary;
+        if (isBonus && allowance.bonusBasedOn === "Gross") {
+          baseAmount = formData.grossSalary;
+        }
+        
+        const allowanceAmount = allowance.type === "Percentage" 
+          ? (baseAmount * allowance.value) / 100 
+          : allowance.value;
+        
+        return (
+          <div key={allowance.id} className="flex items-center space-x-3 p-2 hover:bg-gray-100 rounded">
+            <input
+              type="checkbox"
+              id={`allowance-${allowance.id}`}
+              checked={isSelected}
+              onChange={() => handleAllowanceToggle(allowance)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Label htmlFor={`allowance-${allowance.id}`} className="font-medium cursor-pointer">
+                  {allowance.name}
+                </Label>
+                {isBonus && (
+                  <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                    Bonus
+                  </Badge>
+                )}
               </div>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>
+                  {allowance.type === "Percentage"
+                    ? `${allowance.value}% of ${isBonus && allowance.bonusBasedOn === "Gross" ? "Gross" : "Basic"} = ₹${allowanceAmount.toFixed(2)}`
+                    : `₹${allowance.value} (Fixed)`}
+                </span>
+                <Badge variant="outline" className="text-xs">
+                  {allowance.type}
+                </Badge>
+                {isBonus && allowance.bonusBasedOn && (
+                  <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800">
+                    Based on {allowance.bonusBasedOn}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            {isSelected && (
+              <span className="text-sm font-medium text-green-600">
+                +₹{allowanceAmount.toFixed(2)}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+    
+    {/* Detailed breakdown */}
+    <div className="mt-4 p-3 bg-white border rounded">
+      <h4 className="font-medium mb-2">Calculation Breakdown:</h4>
+      <div className="space-y-1 text-sm">
+        <div className="flex justify-between">
+          <span>Basic Salary:</span>
+          <span>₹{formData.basicSalary.toFixed(2)}</span>
+        </div>
+        {formData.selectedAllowances.map((allowance, index) => {
+          let baseAmount = formData.basicSalary;
+          if (allowance.isBonus && allowance.bonusBasedOn === "Gross") {
+            baseAmount = formData.grossSalary;
+          }
+          
+          const allowanceAmount = allowance.type === "Percentage" 
+            ? (baseAmount * allowance.value) / 100 
+            : allowance.value;
+            
+          return (
+            <div key={index} className="flex justify-between">
+              <span>+ {allowance.name}:</span>
+              <span>₹{allowanceAmount.toFixed(2)}</span>
+            </div>
+          );
+        })}
+        <div className="flex justify-between border-t pt-1 font-medium">
+          <span>Total (Basic + Allowances):</span>
+          <span>₹{expectedGrossFromBasicPlusAllowances.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Gross Salary:</span>
+          <span>₹{formData.grossSalary.toFixed(2)}</span>
+        </div>
+        {!grossMatchesDerived && (
+          <div className="text-red-600 text-xs mt-1">
+            ⚠️ Gross Salary must equal Basic + Selected Allowances
+          </div>
+        )}
+      </div>
+    </div>
+    
+    <div className="mt-3 pt-3 border-t flex items-center justify-between">
+      <p className="text-sm text-gray-600">
+        Selected: {formData.selectedAllowances.length} allowance(s)
+      </p>
+      <p className="text-sm">
+        Basic + Selected Allowances:{" "}
+        <span className="font-semibold">₹{expectedGrossFromBasicPlusAllowances.toFixed(2)}</span>
+        {!grossMatchesDerived && (
+          <span className="text-red-600 ml-2">← doesn't match Gross</span>
+        )}
+      </p>
+    </div>
+  </div>
+</div>
 
               {/* Deduction Selection */}
               <div className="space-y-4">
@@ -817,7 +964,6 @@ export function MonthlyPayGradeManagement() {
                     <p className="text-sm text-gray-600">
                       Selected: {formData.selectedDeductions.length} deduction(s)
                     </p>
-                    {/* LIVE totals + net payable shown only here */}
                     <div className="text-sm space-x-4">
                       <span>
                         Total Deductions: <span className="font-semibold">₹{deductionTotal.toFixed(2)}</span>
@@ -881,7 +1027,6 @@ export function MonthlyPayGradeManagement() {
                   <TableHead className="w-[120px]">Company Name</TableHead>
                   <TableHead className="w-[120px]">Branch Name</TableHead>
                   <TableHead className="w-[150px]">Pay Grade Name</TableHead>
-                  <TableHead className="w-[100px]">Salary Type</TableHead>
                   <TableHead className="w-[100px]">Gross</TableHead>
                   <TableHead className="w-[100px]">Basic</TableHead>
                   <TableHead className="w-[100px]">Allowances</TableHead>
@@ -908,7 +1053,6 @@ export function MonthlyPayGradeManagement() {
                       <TableCell className="whitespace-nowrap">{pg.companyName}</TableCell>
                       <TableCell className="whitespace-nowrap">{pg.branchName}</TableCell>
                       <TableCell className="font-medium whitespace-nowrap">{pg.monthlyPayGradeName}</TableCell>
-                      <TableCell className="whitespace-nowrap text-center">{pg.salType}</TableCell>
                       <TableCell className="whitespace-nowrap text-center">₹{pg.grossSalary}</TableCell>
                       <TableCell className="whitespace-nowrap text-center">₹{pg.basicSalary}</TableCell>
                       <TableCell className="whitespace-nowrap text-center">

@@ -151,8 +151,11 @@ export function CompanyManagement() {
       }
 
       // 2) choose companyName: manual first, autocomplete fallback
+      const { autocompleteName, id, ...formDataWithoutAutocomplete } = formData;
+      // Remove any nested objects that shouldn't be sent to backend
+      const { serviceProvider, ...cleanFormData } = formDataWithoutAutocomplete as any;
       const finalData = {
-  ...formData,
+  ...cleanFormData,
   companyName: formData.companyName || formData.autocompleteName || "",
   serviceProviderID: formData.serviceProviderID || undefined,
   companyLogoUrl: companyLogoUrl || undefined,

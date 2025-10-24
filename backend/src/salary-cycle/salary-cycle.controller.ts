@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, Query } from '@nestjs/common';
 import { SalaryCycleService } from './salary-cycle.service';
 import { CreateSalaryCycleDto } from './dto/create-salary-cycle.dto';
 import { UpdateSalaryCycleDto } from './dto/update-salary-cycle.dto';
+import { FindSalaryCycleQueryDto } from './dto/find-salary-cycle.query.dto';
 
 @Controller('salary-cycle')
 export class SalaryCycleController {
@@ -15,6 +16,12 @@ export class SalaryCycleController {
   @Get()
   findAll() {
     return this.service.findAll();
+  }
+
+     // 🔹 New endpoint
+  @Get('company/:companyID')
+  findByCompany(@Param('companyID', ParseIntPipe) companyID: number) {
+    return this.service.findByCompany(companyID);
   }
 
   @Get(':id')

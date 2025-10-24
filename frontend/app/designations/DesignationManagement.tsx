@@ -36,7 +36,7 @@ interface DesignationRead {
   serviceProviderID?: ID | null;
   companyID?: ID | null;
   branchesID?: ID | null;
-  designantion?: string | null;        // <- matches your prisma field spelling
+  desgination?: string | null;        // <- matches your prisma field spelling
   createdAt?: string | null;
 
   // optional nested if API includes them
@@ -123,7 +123,7 @@ export function DesignationManagement() {
     companyID: null as ID | null,
     branchesID: null as ID | null,
 
-    designantion: "",
+    desgination: "",
 
     spAutocomplete: "",
     coAutocomplete: "",
@@ -270,7 +270,7 @@ export function DesignationManagement() {
       serviceProviderID: null,
       companyID: null,
       branchesID: null,
-      designantion: "",
+      desgination: "",
       spAutocomplete: "",
       coAutocomplete: "",
       brAutocomplete: "",
@@ -289,7 +289,7 @@ export function DesignationManagement() {
       companyID: r.companyID ?? r.company?.id ?? null,
       branchesID: r.branchesID ?? r.branches?.id ?? null,
 
-      designantion: r.designantion ?? "",
+      desgination: r.desgination ?? "",
 
       spAutocomplete: r.serviceProvider?.companyName
         ?? r.serviceProviderName
@@ -334,7 +334,7 @@ export function DesignationManagement() {
       serviceProviderID: formData.serviceProviderID ?? undefined,
       companyID: formData.companyID ?? undefined,
       branchesID: formData.branchesID ?? undefined,
-      designantion: formData.designantion || undefined,
+      desgination: formData.desgination || undefined,
     };
 
     try {
@@ -378,7 +378,7 @@ export function DesignationManagement() {
       r.branches?.branchName ?? r.branchName ?? (r.branchesID != null ? brMap[r.branchesID] : "");
     return rows.filter((r) =>
       [
-        r.designantion,
+        r.desgination,
         spNameOf(r),
         coNameOf(r),
         brNameOf(r),
@@ -570,8 +570,8 @@ export function DesignationManagement() {
               <div className="space-y-2">
                 <Label>Designation *</Label>
                 <Input
-                  value={formData.designantion}
-                  onChange={(e) => setFormData((p) => ({ ...p, designantion: e.target.value }))}
+                  value={formData.desgination}
+                  onChange={(e) => setFormData((p) => ({ ...p, desgination: e.target.value }))}
                   required
                 />
               </div>
@@ -596,7 +596,7 @@ export function DesignationManagement() {
           </DialogHeader>
           {viewRow && (
             <div className="space-y-3">
-              <p><strong>Designation:</strong> {viewRow.designantion || "—"}</p>
+              <p><strong>Designation:</strong> {viewRow.desgination || "—"}</p>
               <p><strong>Service Provider:</strong> {spName(viewRow)}</p>
               <p><strong>Company:</strong> {coName(viewRow)}</p>
               <p><strong>Branch:</strong> {brName(viewRow)}</p>
@@ -661,7 +661,7 @@ export function DesignationManagement() {
                 ) : (
                   filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="whitespace-nowrap">{r.designantion || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.desgination || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{spName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{coName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{brName(r)}</TableCell>

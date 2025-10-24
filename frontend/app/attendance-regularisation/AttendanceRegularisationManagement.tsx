@@ -39,6 +39,7 @@ interface AttendanceRegularisation {
   employeeId?: string
   employeeName?: string
   attendanceDate: string
+  day?: string
   checkInTime: string
   checkOutTime: string
   remarks?: string
@@ -67,6 +68,7 @@ export function AttendanceRegularisationManagement() {
     employeeName: "",
     attendanceDate: "",
     checkInTime: "",
+    day: "",
     checkOutTime: "",
     remarks: "",
     serviceProviderID: undefined as number | undefined,
@@ -87,8 +89,8 @@ export function AttendanceRegularisationManagement() {
       const q = query.toLowerCase()
       return Array.isArray(data)
         ? data.filter((item: any) =>
-            (item?.companyName || "").toLowerCase().includes(q)
-          )
+          (item?.companyName || "").toLowerCase().includes(q)
+        )
         : []
     } catch (error) {
       console.error("Error fetching service providers:", error)
@@ -103,8 +105,8 @@ export function AttendanceRegularisationManagement() {
       const q = query.toLowerCase()
       return Array.isArray(data)
         ? data.filter((item: any) =>
-            (item?.companyName || "").toLowerCase().includes(q)
-          )
+          (item?.companyName || "").toLowerCase().includes(q)
+        )
         : []
     } catch (error) {
       console.error("Error fetching companies:", error)
@@ -119,8 +121,8 @@ export function AttendanceRegularisationManagement() {
       const q = query.toLowerCase()
       return Array.isArray(data)
         ? data.filter((item: any) =>
-            (item?.branchName || "").toLowerCase().includes(q)
-          )
+          (item?.branchName || "").toLowerCase().includes(q)
+        )
         : []
     } catch (error) {
       console.error("Error fetching branches:", error)
@@ -135,13 +137,13 @@ export function AttendanceRegularisationManagement() {
       const q = query.toLowerCase()
       return Array.isArray(data)
         ? data.filter((item: any) => {
-            const fullName = `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim().toLowerCase()
-            const employeeId = (item?.employeeID || "").toLowerCase()
-            return fullName.includes(q) || employeeId.includes(q)
-          }).map((item: any) => ({
-            ...item,
-            displayName: `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim() + (item?.employeeID ? ` (${item.employeeID})` : "")
-          }))
+          const fullName = `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim().toLowerCase()
+          const employeeId = (item?.employeeID || "").toLowerCase()
+          return fullName.includes(q) || employeeId.includes(q)
+        }).map((item: any) => ({
+          ...item,
+          displayName: `${item?.employeeFirstName || ""} ${item?.employeeLastName || ""}`.trim() + (item?.employeeID ? ` (${item.employeeID})` : "")
+        }))
         : []
     } catch (error) {
       console.error("Error fetching employees:", error)
@@ -171,7 +173,8 @@ export function AttendanceRegularisationManagement() {
           companyName: regularisation.company?.companyName || "",
           branchName: regularisation.branches?.branchName || "",
           employeeId: regularisation.manageEmployee?.employeeID || "",
-          employeeName: regularisation.manageEmployee ? 
+          day: regularisation.day || "",
+          employeeName: regularisation.manageEmployee ?
             `${regularisation.manageEmployee.employeeFirstName || ""} ${regularisation.manageEmployee.employeeLastName || ""}`.trim() : "",
           attendanceDate: regularisation.attendanceDate
             ? new Date(regularisation.attendanceDate).toISOString().split("T")[0]
@@ -248,6 +251,7 @@ export function AttendanceRegularisationManagement() {
         branchesID: formData.branchesID,
         manageEmployeeID: formData.manageEmployeeID,
         attendanceDate: formData.attendanceDate ? new Date(formData.attendanceDate) : null,
+        day: formData.day,
         checkInTime: formData.checkInTime ? new Date(`2000-01-01T${formData.checkInTime}`) : null,
         checkOutTime: formData.checkOutTime ? new Date(`2000-01-01T${formData.checkOutTime}`) : null,
         remarks: formData.remarks,
@@ -285,6 +289,7 @@ export function AttendanceRegularisationManagement() {
       checkInTime: "",
       checkOutTime: "",
       remarks: "",
+      day: "",
       serviceProviderID: undefined,
       companyID: undefined,
       branchesID: undefined,
@@ -304,6 +309,7 @@ export function AttendanceRegularisationManagement() {
       checkInTime: regularisation.checkInTime,
       checkOutTime: regularisation.checkOutTime,
       remarks: regularisation.remarks || "",
+      day: regularisation.day || "",
       serviceProviderID: regularisation.serviceProviderID,
       companyID: regularisation.companyID,
       branchesID: regularisation.branchesID,
@@ -386,8 +392,8 @@ export function AttendanceRegularisationManagement() {
                   {editingRegularisation ? "Edit Attendance Regularisation" : "Submit Attendance Regularisation"}
                 </DialogTitle>
                 <DialogDescription>
-                  {editingRegularisation 
-                    ? "Update the attendance regularisation information below." 
+                  {editingRegularisation
+                    ? "Update the attendance regularisation information below."
                     : "Fill in the details to submit a new attendance regularisation."
                   }
                 </DialogDescription>
@@ -482,29 +488,23 @@ export function AttendanceRegularisationManagement() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="checkInTime">Check-In Time *</Label>
-                      <Input
-                        id="checkInTime"
-                        type="time"
-                        value={formData.checkInTime}
-                        onChange={(e) => setFormData(prev => ({ ...prev, checkInTime: e.target.value }))}
-                        className="w-full"
+                      <Label htmlFor="day">Day</Label>
+                      <select
+                        id="day"
+                        value={formData.day}
+                        onChange={(e) => setFormData(prev => ({ ...prev, day: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
-                      />
-                      <p className="text-xs text-gray-500">Format: 0:00:00</p>
+                      >
+                        <option value="">Select Day</option>
+                        <option value="fullday">Full Day</option>
+                        <option value="halfday">Half Day</option>
+                        <option value="absent">Absent</option>
+                      </select>
+
+
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="checkOutTime">Check-Out Time *</Label>
-                      <Input
-                        id="checkOutTime"
-                        type="time"
-                        value={formData.checkOutTime}
-                        onChange={(e) => setFormData(prev => ({ ...prev, checkOutTime: e.target.value }))}
-                        className="w-full"
-                        required
-                      />
-                      <p className="text-xs text-gray-500">Format: 0:00:00</p>
-                    </div>
+
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="remarks">Remarks</Label>
@@ -566,15 +566,12 @@ export function AttendanceRegularisationManagement() {
             <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
                   <TableHead className="w-[90px]">Service Provider</TableHead>
                   <TableHead className="w-[80px]">Company Name</TableHead>
                   <TableHead className="w-[80px]">Branch Name</TableHead>
                   <TableHead className="w-[70px]">Employee ID</TableHead>
                   <TableHead className="w-[100px]">Employee Name</TableHead>
                   <TableHead className="w-[80px]">Attendance Date</TableHead>
-                  <TableHead className="w-[80px]">Check-In Time</TableHead>
-                  <TableHead className="w-[80px]">Check-Out Time</TableHead>
                   <TableHead className="w-[80px]">Remarks</TableHead>
                   <TableHead className="w-[70px]">Status</TableHead>
                   <TableHead className="w-[80px]">Created</TableHead>
@@ -595,20 +592,17 @@ export function AttendanceRegularisationManagement() {
                 ) : (
                   filteredRegularisations.map((regularisation, index) => (
                     <TableRow key={regularisation.id}>
-                      <TableCell className="font-medium truncate">{index + 1}</TableCell>
                       <TableCell className="truncate" title={regularisation.serviceProvider}>{regularisation.serviceProvider}</TableCell>
                       <TableCell className="truncate" title={regularisation.companyName}>{regularisation.companyName}</TableCell>
                       <TableCell className="truncate" title={regularisation.branchName}>{regularisation.branchName}</TableCell>
                       <TableCell className="truncate">{regularisation.employeeId}</TableCell>
                       <TableCell className="truncate" title={regularisation.employeeName}>{regularisation.employeeName}</TableCell>
                       <TableCell className="truncate">{regularisation.attendanceDate}</TableCell>
-                      <TableCell className="truncate">{regularisation.checkInTime}</TableCell>
-                      <TableCell className="truncate">{regularisation.checkOutTime}</TableCell>
                       <TableCell className="truncate" title={regularisation.remarks}>{regularisation.remarks}</TableCell>
                       <TableCell className="whitespace-nowrap">
                         <Badge variant={
-                          regularisation.status === "Approved" ? "default" : 
-                          regularisation.status === "Rejected" ? "destructive" : "secondary"
+                          regularisation.status === "Approved" ? "default" :
+                            regularisation.status === "Rejected" ? "destructive" : "secondary"
                         }>
                           {regularisation.status}
                         </Badge>

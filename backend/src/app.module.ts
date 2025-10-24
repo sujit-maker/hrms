@@ -34,8 +34,12 @@ import { BonousAllocationModule } from './bonous-allocation/bonous-allocation.mo
 import { WorkShiftModule } from './work-shift/work-shift.module';
 import { AttlogListenerModule } from './attlog-listener/attlog-listener.module';
 import { EmpAttendanceSyncModule } from './emp-attendance-sync/emp-attendance-sync.module';
-import { TestListenerModule } from './test-listener/test-listener.module';
 import { CalenderModule } from './calender/calender.module';
+import { GenerateSalaryModule } from './generate-salary/generate-salary.module';
+import { EmpAttendanceLogsModule } from './emp-attendance-logs/emp-attendance-logs.module';
+import { SalaryAdvanceModule } from './salary-advance/salary-advance.module';
+import { SalaryAdvanceRepaymentModule } from './salary-advance-repayment/salary-advance-repayment.module';
+import { ReimbursementModule } from './reimbursement/reimbursement.module';
 
 @Module({
   imports: [
@@ -76,8 +80,12 @@ import { CalenderModule } from './calender/calender.module';
     WorkShiftModule,
     AttlogListenerModule,
     EmpAttendanceSyncModule,
-    TestListenerModule,
     CalenderModule,
+    GenerateSalaryModule,
+    EmpAttendanceLogsModule,
+    SalaryAdvanceModule,
+    SalaryAdvanceRepaymentModule,
+    ReimbursementModule,
   ],
 })
 export class AppModule {}

@@ -398,7 +398,7 @@ const [signatureFile, setSignatureFile] = useState<File | null>(null);
     }
   };
 
-  const handleEdit = (b: BranchRead) => {
+  const handleEdit = async (b: BranchRead) => {
     setEditingBranch(b);
 
     const bankDetailsForm: BankDetailForm[] = (b.bankDetails ?? []).map((bd) => ({
@@ -409,6 +409,28 @@ const [signatureFile, setSignatureFile] = useState<File | null>(null);
       accountNo: bd.accountNo ?? "",
       ifscCode: bd.ifscCode ?? "",
     }));
+
+    // Fetch service provider and company names for autocomplete fields
+    let spName = "";
+    let coName = "";
+
+    if (b.serviceProviderID) {
+      try {
+        const sp = await fetchJSONSafe<ServiceProvider>(`${API.serviceProviders}/${b.serviceProviderID}`);
+        spName = sp.companyName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch service provider name:", e);
+      }
+    }
+
+    if (b.companyID) {
+      try {
+        const co = await fetchJSONSafe<Company>(`${API.companies}/${b.companyID}`);
+        coName = co.companyName ?? "";
+      } catch (e) {
+        console.warn("Could not fetch company name:", e);
+      }
+    }
 
     setFormData({
       serviceProviderID: b.serviceProviderID ?? null,
@@ -432,13 +454,20 @@ const [signatureFile, setSignatureFile] = useState<File | null>(null);
       SignatureUrl: b.SignatureUrl ?? "",
       financialYearStart: b.financialYearStart ?? "",     
 
-      spAutocomplete: "", // we fetch lists by typing; leave blank initially
-      coAutocomplete: "",
+      spAutocomplete: spName,
+      coAutocomplete: coName,
 
       bankDetailsForm,
     });
 
     setOriginalBankIds(bankDetailsForm.filter(x => x.id != null).map(x => x.id!) );
+    
+    // Clear suggestion lists to prevent highlighting/focus
+    setTimeout(() => {
+      setSpList([]);
+      setCoList([]);
+    }, 0);
+    
     setIsDialogOpen(true);
   };
 
@@ -516,19 +545,23 @@ const [signatureFile, setSignatureFile] = useState<File | null>(null);
                 <Input
                   value={formData.spAutocomplete}
                   onChange={(e) => {
+                    if (editingBranch) return; // Prevent changes in edit mode
                     const val = e.target.value;
                     setFormData((p) => ({ ...p, spAutocomplete: val, serviceProviderID: null }));
                     runFetchServiceProviders(val);
                   }}
                   onFocus={(e) => {
+                    if (editingBranch) return; // Prevent focus actions in edit mode
                     const val = e.target.value;
                     if (val.length >= MIN_CHARS) runFetchServiceProviders(val);
                   }}
                   placeholder="Start typing service provider..."
                   autoComplete="off"
                   required
+                  readOnly={editingBranch ? true : false}
+                  className={editingBranch ? "bg-gray-50 cursor-not-allowed" : ""}
                 />
-                {spList.length > 0 && (
+                {spList.length > 0 && !editingBranch && (
                   <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
                     {spLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
                     {spList.map((sp) => (
@@ -558,19 +591,23 @@ const [signatureFile, setSignatureFile] = useState<File | null>(null);
                 <Input
                   value={formData.coAutocomplete}
                   onChange={(e) => {
+                    if (editingBranch) return; // Prevent changes in edit mode
                     const val = e.target.value;
                     setFormData((p) => ({ ...p, coAutocomplete: val, companyID: null }));
                     runFetchCompanies(val);
                   }}
                   onFocus={(e) => {
+                    if (editingBranch) return; // Prevent focus actions in edit mode
                     const val = e.target.value;
                     if (val.length >= MIN_CHARS) runFetchCompanies(val);
                   }}
                   placeholder="Start typing company..."
                   autoComplete="off"
                   required
+                  readOnly={editingBranch ? true : false}
+                  className={editingBranch ? "bg-gray-50 cursor-not-allowed" : ""}
                 />
-                {coList.length > 0 && (
+                {coList.length > 0 && !editingBranch && (
                   <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
                     {coLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
                     {coList.map((co) => (

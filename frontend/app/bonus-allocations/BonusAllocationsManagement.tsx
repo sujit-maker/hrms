@@ -29,11 +29,22 @@ const MIN_CHARS = 1;
 type ApiAllocation = {
   id: number;
   bonusSetupID: number;
-  financialYear: number | null; // starting FY year number (e.g., 2025)
-  salaryPeriod: number | null;  // 1..12, start month of the period
+  financialYear: number | null;
+  salaryPeriod: number | null;
   employeeID: number;
   createdAt?: string;
-  bonusSetup?: { id: number; BonusName: string | null } | null;
+  bonusSetup?: {
+    id: number;
+    bonusName: string | null;
+    serviceProviderID: number | null;
+    companyID: number | null;
+    branchesID: number | null;
+    bonusType: string | null;
+    bonusDescription: string | null;
+    bonusBasedOn: string | null;
+    bonusPercentage: string | null;
+    bonusFixed: string | null;
+  } | null;
   manageEmployee?: {
     id: number;
     employeeID: string;
@@ -49,17 +60,17 @@ type EmployeeApi = {
   employeeLastName: string | null;
 };
 
-type BonusSetupApi = { id: number; BonusName: string | null };
+type BonusSetupApi = { id: number; bonusName: string | null };
 
 type CompanyApi = {
   id: number;
   companyName?: string | null;
-  financialYearStart?: string | null; // "1st Jan" | "1st April"
+  financialYearStart?: string | null;
 };
 
 type SalaryCycleApi = {
   id: number;
-  monthStartDay?: string | null; // "1", "5", ...
+  monthStartDay?: string | null;
 };
 
 interface BonusAllocationUI {
@@ -67,11 +78,11 @@ interface BonusAllocationUI {
   bonusSetupID: number;
   employeeDbID: number;
   bonusName: string;
-  financialYearLabel: string; // "2025" or "2025-2026"
-  salaryPeriodLabel: string;  // "January 2025" or "5 Jan to 4 Feb"
+  financialYearLabel: string;
+  salaryPeriodLabel: string;
   employeeName: string;
   employeeCode: string;
-  bonusAmount: number;              // UI-only
+  bonusAmount: number;
   createdAt: string;
 }
 
@@ -93,37 +104,27 @@ function isJanStart(fyStart?: string | null) {
 function buildFinancialYearOptions(financialYearStart?: string | null): string[] {
   const y = getCurrentYear();
   if (isJanStart(financialYearStart)) {
-    // Calendar FY → show current year only, e.g., "2025"
     return [String(y)];
   }
-  // Default to "1st April" style → "YYYY-YYYY+1"
   return [`${y}-${y + 1}`];
 }
 
-/**
- * Build Salary Period options based on FY start + salary cycle.
- * Rule update: If FY start is "1st Jan" -> show calendar months of current year.
- */
 function buildSalaryPeriods(financialYearStart?: string | null, monthStartDay?: string | null): string[] {
   const y = getCurrentYear();
 
-  // NEW RULE: Calendar FY -> months of current year regardless of monthStartDay
   if (isJanStart(financialYearStart)) {
     return monthsFull.map((m) => `${m} ${y}`);
   }
 
-  // Otherwise respect salary-cycle rules:
   const start = parseInt(monthStartDay ?? "1", 10);
   if (!Number.isFinite(start) || start <= 1) {
-    // monthStartDay = 1 → normal months in current year
     return monthsFull.map((m) => `${m} ${y}`);
   }
 
-  // Rolling windows: "D Mon to (D-1) NextMon"
   const endDay = start - 1;
   const out: string[] = [];
   for (let i = 0; i < 12; i++) {
-    const mIdx = i; // 0..11 for Jan..Dec
+    const mIdx = i;
     const nextIdx = (mIdx + 1) % 12;
     const label = `${start} ${monthsShort[mIdx]} to ${endDay} ${monthsShort[nextIdx]}`;
     out.push(label);
@@ -134,19 +135,17 @@ function buildSalaryPeriods(financialYearStart?: string | null, monthStartDay?: 
 function nameFromEmp(e?: { employeeFirstName: string | null; employeeLastName: string | null } | null) {
   const f = (e?.employeeFirstName ?? "").trim();
   const l = (e?.employeeLastName ?? "").trim();
-  return [f, l].filter(Boolean).join(" ");
+  return [f, l].filter(Boolean).join(" ") || "-";
 }
 
-/** FY label from starting year number */
 function inferFinancialYearLabelFromNumber(year?: number, financialYearStart?: string | null) {
-  if (!year) return "";
+  if (!year) return "-";
   if (isJanStart(financialYearStart)) return String(year);
   return `${year}-${year + 1}`;
 }
 
-/** Salary period label from month number and rules */
 function inferSalaryPeriodLabelFromNumber(m?: number, monthStartDay?: string | null, financialYearStart?: string | null) {
-  if (!m || m < 1 || m > 12) return "";
+  if (!m || m < 1 || m > 12) return "-";
   const y = getCurrentYear();
 
   if (isJanStart(financialYearStart)) {
@@ -163,14 +162,11 @@ function inferSalaryPeriodLabelFromNumber(m?: number, monthStartDay?: string | n
   return `${start} ${monthsShort[mIdx]} to ${endDay} ${monthsShort[nextIdx]}`;
 }
 
-/** parse FY label -> starting year number */
 function parseFinancialYearLabelToYear(label: string): number | null {
-  // Handles "2025" or "2025-2026"
   const m = label.match(/\b(20\d{2})\b/);
   return m ? parseInt(m[1], 10) : null;
 }
 
-/** parse salary period UI label -> month number 1..12 (uses first month mentioned) */
 function parseSalaryPeriodLabelToMonth(label: string): number | null {
   const lower = label.toLowerCase();
   for (let i = 0; i < 12; i++) {
@@ -188,7 +184,6 @@ export function BonusAllocationsManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAllocation, setEditingAllocation] = useState<BonusAllocationUI | null>(null);
 
-  // Suggestions
   const [empList, setEmpList] = useState<EmployeeApi[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [bonusList, setBonusList] = useState<BonusSetupApi[]>([]);
@@ -197,13 +192,11 @@ export function BonusAllocationsManagement() {
   const empRef = useRef<HTMLDivElement | null>(null);
   const bonusRef = useRef<HTMLDivElement | null>(null);
 
-  // Dynamic options (driven by /company and /salary-cycle)
   const [financialYearStart, setFinancialYearStart] = useState<string>("1st April");
   const [monthStartDay, setMonthStartDay] = useState<string>("1");
   const [financialYearOptions, setFinancialYearOptions] = useState<string[]>([]);
   const [salaryPeriodOptions, setSalaryPeriodOptions] = useState<string[]>([]);
 
-  // Form data
   const [formData, setFormData] = useState({
     bonusSetupID: null as number | null,
     employeeDbID: null as number | null,
@@ -213,7 +206,6 @@ export function BonusAllocationsManagement() {
     salaryPeriodLabel: "",
   });
 
-  /* -------- click outside to close popovers -------- */
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Node;
@@ -224,7 +216,6 @@ export function BonusAllocationsManagement() {
     return () => document.removeEventListener("click", onDocClick);
   }, []);
 
-  /* ---------------- initial load ---------------- */
   useEffect(() => {
     (async () => {
       try {
@@ -232,7 +223,7 @@ export function BonusAllocationsManagement() {
         const res = await fetch(API.allocations);
         const data: ApiAllocation[] = await res.json();
 
-        // Load company FY start (use the first company if multiple)
+        // Load company FY start
         const cRes = await fetch(API.companies);
         const companies: CompanyApi[] = await cRes.json();
         const fyStart = (companies?.[0]?.financialYearStart ?? "1st April") as string;
@@ -244,25 +235,30 @@ export function BonusAllocationsManagement() {
         const mStart = (cycles?.[0]?.monthStartDay ?? "1") as string;
         setMonthStartDay(mStart);
 
-        // Build options now that we know the rules
+        // Build options
         setFinancialYearOptions(buildFinancialYearOptions(fyStart));
         setSalaryPeriodOptions(buildSalaryPeriods(fyStart, mStart));
 
-        // Map allocations with labels using those rules
+        // CORRECTED: Map allocations with proper data extraction
         setAllocations(
-          data.map((x) => ({
-            id: String(x.id),
-            bonusSetupID: x.bonusSetupID,
-            employeeDbID: x.employeeID,
-            bonusName: x.bonusSetup?.BonusName ?? "-",
-            financialYearLabel: inferFinancialYearLabelFromNumber(x.financialYear ?? undefined, fyStart),
-            salaryPeriodLabel: inferSalaryPeriodLabelFromNumber(x.salaryPeriod ?? undefined, mStart, fyStart),
-            employeeName: nameFromEmp(x.manageEmployee),
-            employeeCode: x.manageEmployee?.employeeID ?? "",
-            bonusAmount: 0,
-            status: "Pending",
-            createdAt: x.createdAt ? x.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
-          }))
+          data.map((x) => {
+            const bonusName = x.bonusSetup?.bonusName || "-";
+            const employeeName = nameFromEmp(x.manageEmployee);
+            const employeeCode = x.manageEmployee?.employeeID || "";
+            
+            return {
+              id: String(x.id),
+              bonusSetupID: x.bonusSetupID,
+              employeeDbID: x.employeeID,
+              bonusName: bonusName,
+              financialYearLabel: inferFinancialYearLabelFromNumber(x.financialYear ?? undefined, fyStart),
+              salaryPeriodLabel: inferSalaryPeriodLabelFromNumber(x.salaryPeriod ?? undefined, mStart, fyStart),
+              employeeName: employeeName,
+              employeeCode: employeeCode,
+              bonusAmount: 0,
+              createdAt: x.createdAt ? x.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
+            };
+          })
         );
       } catch (e) {
         console.error("Failed to load data", e);
@@ -270,13 +266,11 @@ export function BonusAllocationsManagement() {
     })();
   }, []);
 
-  // If FY start or month start day change later, refresh options (rare)
   useEffect(() => {
     setFinancialYearOptions(buildFinancialYearOptions(financialYearStart));
     setSalaryPeriodOptions(buildSalaryPeriods(financialYearStart, monthStartDay));
   }, [financialYearStart, monthStartDay]);
 
-  /* ---------------- helpers ---------------- */
   async function robustGet(url: string, q?: string) {
     try {
       const res = await fetch(q ? `${url}?q=${encodeURIComponent(q)}` : url);
@@ -289,7 +283,6 @@ export function BonusAllocationsManagement() {
     }
   }
 
-  /* ---------------- debounced fetchers for suggestions ---------------- */
   const runFetchEmployees = debounce(async (val: string) => {
     if (!val || val.length < MIN_CHARS) return setEmpList([]);
     setEmpLoading(true);
@@ -315,7 +308,7 @@ export function BonusAllocationsManagement() {
     try {
       const list: BonusSetupApi[] = await robustGet(API.bonusSetups, val);
       const lc = val.toLowerCase();
-      const filtered = list.filter((b) => (b.BonusName ?? "").toLowerCase().includes(lc));
+      const filtered = list.filter((b) => (b.bonusName ?? "").toLowerCase().includes(lc));
       setBonusList(filtered.slice(0, 50));
     } catch (e) {
       console.error("Bonus fetch error", e);
@@ -325,7 +318,6 @@ export function BonusAllocationsManagement() {
     }
   }, 250);
 
-  /* ---------------- CRUD ---------------- */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.bonusSetupID || !formData.employeeDbID) return;
@@ -345,24 +337,22 @@ export function BonusAllocationsManagement() {
           body: JSON.stringify(payload),
         });
         const updated: ApiAllocation = await res.json();
-        setAllocations((prev) =>
-          prev.map((a) =>
-            a.id === String(updated.id)
-              ? {
-                  id: String(updated.id),
-                  bonusSetupID: updated.bonusSetupID,
-                  employeeDbID: updated.employeeID,
-                  bonusName: a.bonusName,
-                  financialYearLabel: inferFinancialYearLabelFromNumber(payload.financialYear ?? undefined, financialYearStart),
-                  salaryPeriodLabel: inferSalaryPeriodLabelFromNumber(payload.salaryPeriod ?? undefined, monthStartDay, financialYearStart),
-                  employeeName: a.employeeName,
-                  employeeCode: a.employeeCode,
-                  bonusAmount: a.bonusAmount,
-                  createdAt: a.createdAt,
-                }
-              : a
-          )
-        );
+        
+        // CORRECTED: Update with proper data mapping
+        const updatedAllocation: BonusAllocationUI = {
+          id: String(updated.id),
+          bonusSetupID: updated.bonusSetupID,
+          employeeDbID: updated.employeeID,
+          bonusName: updated.bonusSetup?.bonusName || "-",
+          financialYearLabel: inferFinancialYearLabelFromNumber(updated.financialYear ?? undefined, financialYearStart),
+          salaryPeriodLabel: inferSalaryPeriodLabelFromNumber(updated.salaryPeriod ?? undefined, monthStartDay, financialYearStart),
+          employeeName: nameFromEmp(updated.manageEmployee),
+          employeeCode: updated.manageEmployee?.employeeID || "",
+          bonusAmount: 0,
+          createdAt: updated.createdAt ? updated.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
+        };
+
+        setAllocations((prev) => prev.map((a) => a.id === String(updated.id) ? updatedAllocation : a));
       } else {
         const res = await fetch(API.allocations, {
           method: "POST",
@@ -370,22 +360,22 @@ export function BonusAllocationsManagement() {
           body: JSON.stringify(payload),
         });
         const created: ApiAllocation = await res.json();
-        setAllocations((prev) => [
-          {
-            id: String(created.id),
-            bonusSetupID: created.bonusSetupID,
-            employeeDbID: created.employeeID,
-            bonusName: "-",
-            financialYearLabel: inferFinancialYearLabelFromNumber(payload.financialYear ?? undefined, financialYearStart),
-            salaryPeriodLabel: inferSalaryPeriodLabelFromNumber(payload.salaryPeriod ?? undefined, monthStartDay, financialYearStart),
-            employeeName: "-",
-            employeeCode: "",
-            bonusAmount: 0,
-            status: "Pending",
-            createdAt: created.createdAt ? created.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
-          },
-          ...prev,
-        ]);
+        
+        // CORRECTED: Create with proper data mapping
+        const newAllocation: BonusAllocationUI = {
+          id: String(created.id),
+          bonusSetupID: created.bonusSetupID,
+          employeeDbID: created.employeeID,
+          bonusName: created.bonusSetup?.bonusName || "-",
+          financialYearLabel: inferFinancialYearLabelFromNumber(created.financialYear ?? undefined, financialYearStart),
+          salaryPeriodLabel: inferSalaryPeriodLabelFromNumber(created.salaryPeriod ?? undefined, monthStartDay, financialYearStart),
+          employeeName: nameFromEmp(created.manageEmployee),
+          employeeCode: created.manageEmployee?.employeeID || "",
+          bonusAmount: 0,
+          createdAt: created.createdAt ? created.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
+        };
+
+        setAllocations((prev) => [newAllocation, ...prev]);
       }
       resetForm();
       setIsDialogOpen(false);
@@ -395,6 +385,7 @@ export function BonusAllocationsManagement() {
   };
 
   const handleEdit = (allocation: BonusAllocationUI) => {
+    // CORRECTED: Set form data with proper values for edit modal
     setFormData({
       bonusSetupID: allocation.bonusSetupID,
       employeeDbID: allocation.employeeDbID,
@@ -403,8 +394,8 @@ export function BonusAllocationsManagement() {
       financialYearLabel: allocation.financialYearLabel,
       salaryPeriodLabel: allocation.salaryPeriodLabel,
     });
-    setIsDialogOpen(true);
     setEditingAllocation(allocation);
+    setIsDialogOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -416,8 +407,6 @@ export function BonusAllocationsManagement() {
     }
   };
 
- 
-
   const resetForm = () => {
     setFormData({
       bonusSetupID: null,
@@ -428,7 +417,8 @@ export function BonusAllocationsManagement() {
       salaryPeriodLabel: "",
     });
     setEditingAllocation(null);
-    setEmpList([]); setBonusList([]);
+    setEmpList([]); 
+    setBonusList([]);
   };
 
   const filteredAllocations = useMemo(() => {
@@ -443,17 +433,14 @@ export function BonusAllocationsManagement() {
     );
   }, [allocations, searchTerm]);
 
-  /* ---------------- UI ---------------- */
   return (
     <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
-      {/* Header */}
       <div className="flex items-center justify-between w-full">
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900">Bonus Allocations</h1>
           <p className="text-gray-600 mt-1 text-sm">Manage bonus allocations</p>
         </div>
         <div className="flex items-center gap-3">
-          
           <Dialog open={isDialogOpen} onOpenChange={(o) => { setIsDialogOpen(o); if (!o) resetForm(); }}>
             <DialogTrigger asChild>
               <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-sm px-3 py-2">
@@ -470,7 +457,6 @@ export function BonusAllocationsManagement() {
               </DialogHeader>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Bonus Name (Autocomplete) */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Bonus Configuration</h3>
                   <div ref={bonusRef} className="space-y-2 relative">
@@ -502,12 +488,12 @@ export function BonusAllocationsManagement() {
                               setFormData((p) => ({
                                 ...p,
                                 bonusSetupID: b.id,
-                                bonusAutocomplete: b.BonusName ?? "",
+                                bonusAutocomplete: b.bonusName ?? "",
                               }));
                               setBonusList([]);
                             }}
                           >
-                            {b.BonusName}
+                            {b.bonusName}
                           </div>
                         ))}
                       </div>
@@ -515,7 +501,6 @@ export function BonusAllocationsManagement() {
                   </div>
                 </div>
 
-                {/* Period Configuration */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Period Configuration</h3>
                   <div className="grid grid-cols-2 gap-4">
@@ -548,12 +533,10 @@ export function BonusAllocationsManagement() {
                           <option key={period} value={period}>{period}</option>
                         ))}
                       </select>
-                      
                     </div>
                   </div>
                 </div>
 
-                {/* Employee (Autocomplete) */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Employee Selection</h3>
                   <div ref={empRef} className="space-y-2 relative">
@@ -615,7 +598,6 @@ export function BonusAllocationsManagement() {
         </div>
       </div>
 
-      {/* Search and Filters */}
       <Card>
         <CardContent className="p-6">
           <div className="flex items-center space-x-4 w-full">
@@ -635,7 +617,6 @@ export function BonusAllocationsManagement() {
         </CardContent>
       </Card>
 
-      {/* Table */}
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -660,7 +641,7 @@ export function BonusAllocationsManagement() {
               <TableBody>
                 {filteredAllocations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <Icon icon="mdi:trophy-outline" className="w-12 h-12 text-gray-300" />
                         <p>No bonus allocations found</p>
@@ -676,7 +657,6 @@ export function BonusAllocationsManagement() {
                       <TableCell className="whitespace-nowrap">{a.salaryPeriodLabel}</TableCell>
                       <TableCell className="whitespace-nowrap">{a.employeeName}</TableCell>
                       <TableCell className="whitespace-nowrap">{a.employeeCode}</TableCell>
-                      
                       <TableCell className="whitespace-nowrap">{a.createdAt}</TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
@@ -705,7 +685,6 @@ export function BonusAllocationsManagement() {
   );
 }
 
-/* ---------------- debounce helper ---------------- */
 function debounce<T extends (...args: any[]) => any>(fn: T, ms = 300) {
   let t: any;
   return (...args: Parameters<T>) => {

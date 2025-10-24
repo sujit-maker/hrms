@@ -49,26 +49,44 @@ interface SelectedItem {
   item: any
 }
 
-// Backend URL
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
-// Generate financial years (Jan to Dec and Apr to Mar)
-const generateFinancialYears = () => {
-  const years = []
-  const currentYear = new Date().getFullYear()
-  
-  // Generate years from 2020 to 2030
-  for (let year = 2020; year <= 2030; year++) {
-    // Jan to Dec format
-    years.push(`${year}`)
-    // Apr to Mar format (next year)
-    years.push(`${year}-${(year + 1).toString().slice(-2)}`)
-  }
-  
-  return years
+const monthsFull = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
+]
+
+function clampDay(d:number) {
+  if (!Number.isFinite(d)) return 1
+  return Math.max(1, Math.min(28, Math.floor(d)))
 }
 
-const financialYears = generateFinancialYears()
+function buildFinancialYearOptions(fyStart:string|null|undefined, monthStartDay:string|number|null|undefined) {
+  const now = new Date()
+  const y = now.getFullYear()
+  const day = clampDay(Number(monthStartDay ?? 1))
+  const isJan = (fyStart ?? "").toLowerCase().includes("jan")
+
+  const out:string[] = []
+  if (day === 1) {
+    if (isJan) {
+      out.push(`${y}`) // simple year
+    } else {
+      out.push(`${y}-${y+1}`) // April to March
+    }
+  } else {
+    // Rolling cycles – 12 windows
+    for (let i=0;i<12;i++) {
+      const start = new Date(y, isJan?11:2, day) // Dec(prev)/Mar(curr)
+      start.setMonth(start.getMonth()+i)
+      const end = new Date(start)
+      end.setMonth(end.getMonth()+1)
+      end.setDate(day-1)
+      out.push(`${start.getDate()} ${monthsFull[start.getMonth()]} ${start.getFullYear()} to ${end.getDate()} ${monthsFull[end.getMonth()]} ${end.getFullYear()}`)
+    }
+  }
+  return out
+}
 
 export function PublicHolidayManagement() {
   const [publicHolidays, setPublicHolidays] = useState<PublicHoliday[]>([])
@@ -76,6 +94,8 @@ export function PublicHolidayManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState<PublicHoliday | null>(null)
   const [holidayOptions, setHolidayOptions] = useState<any[]>([])
+  const [financialYearOptions,setFinancialYearOptions] = useState<string[]>([])
+
   const [formData, setFormData] = useState({
     serviceProvider: "",
     companyName: "",
@@ -84,500 +104,175 @@ export function PublicHolidayManagement() {
     financialYear: "",
     startDate: "",
     endDate: "",
-    serviceProviderID: undefined as number | undefined,
-    companyID: undefined as number | undefined,
-    branchesID: undefined as number | undefined,
-    manageHolidayID: undefined as number | undefined,
+    serviceProviderID: undefined as number|undefined,
+    companyID: undefined as number|undefined,
+    branchesID: undefined as number|undefined,
+    manageHolidayID: undefined as number|undefined,
   })
 
-  // API functions for search and suggest
-  const fetchServiceProviders = async (query: string) => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/service-provider`, {
-        cache: "no-store",
-      })
-      const data = await res.json()
-      const q = query.toLowerCase()
-      return Array.isArray(data)
-        ? data.filter((item: any) =>
-            (item?.companyName || "").toLowerCase().includes(q)
-          )
-        : []
-    } catch (error) {
-      console.error("Error fetching service providers:", error)
-      return []
-    }
+  async function robustGet<T=any>(url:string):Promise<T>{
+    const res = await fetch(url,{cache:"no-store"})
+    if(!res.ok) throw new Error(`${res.status}`)
+    return res.json()
   }
 
-  const fetchCompanies = async (query: string) => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/company`, { cache: "no-store" })
-      const data = await res.json()
-      const q = query.toLowerCase()
-      return Array.isArray(data)
-        ? data.filter((item: any) =>
-            (item?.companyName || "").toLowerCase().includes(q)
-          )
-        : []
-    } catch (error) {
-      console.error("Error fetching companies:", error)
-      return []
-    }
+  const fetchServiceProviders = async (q:string) => {
+    const data = await robustGet<any[]>(`${BACKEND_URL}/service-provider`)
+    return data.filter(d=>(d.companyName||"").toLowerCase().includes(q.toLowerCase()))
+  }
+  const fetchCompanies = async (q:string) => {
+    const data = await robustGet<any[]>(`${BACKEND_URL}/company`)
+    return data.filter(d=>(d.companyName||"").toLowerCase().includes(q.toLowerCase()))
+  }
+  const fetchBranches = async (q:string) => {
+    const data = await robustGet<any[]>(`${BACKEND_URL}/branches`)
+    return data.filter(d=>(d.branchName||"").toLowerCase().includes(q.toLowerCase()))
+  }
+  const fetchManageHolidays = async ()=> robustGet<any[]>(`${BACKEND_URL}/manage-holiday`)
+
+  useEffect(()=>{ loadPublicHolidays(); loadHolidayOptions() },[])
+
+  const loadHolidayOptions = async()=> setHolidayOptions(await fetchManageHolidays())
+  const loadPublicHolidays = async()=> {
+    const data = await robustGet<any[]>(`${BACKEND_URL}/public-holiday`)
+    setPublicHolidays(data.map(h=>({
+      id:String(h.id),
+      serviceProviderID:h.serviceProviderID,
+      companyID:h.companyID,
+      branchesID:h.branchesID,
+      manageHolidayID:h.manageHolidayID,
+      serviceProvider:h.serviceProvider?.companyName||"",
+      companyName:h.company?.companyName||"",
+      branchName:h.branches?.branchName||"",
+      holidayName:h.manageHoliday?.holidayName||"",
+      financialYear:h.financialYear,
+      startDate:h.startDate?new Date(h.startDate).toISOString().split("T")[0]:"",
+      endDate:h.endDate?new Date(h.endDate).toISOString().split("T")[0]:"",
+      createdAt:h.createdAt?new Date(h.createdAt).toISOString().split("T")[0]:new Date().toISOString().split("T")[0],
+    })))
   }
 
-  const fetchBranches = async (query: string) => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/branches`, { cache: "no-store" })
-      const data = await res.json()
-      const q = query.toLowerCase()
-      return Array.isArray(data)
-        ? data.filter((item: any) =>
-            (item?.branchName || "").toLowerCase().includes(q)
-          )
-        : []
-    } catch (error) {
-      console.error("Error fetching branches:", error)
-      return []
-    }
+  const handleCompanySelect = async(selected:SelectedItem)=>{
+    setFormData(p=>({...p,companyName:selected.display,companyID:selected.value,financialYear:""}))
+    try{
+      const company = await robustGet<any>(`${BACKEND_URL}/company/${selected.value}`)
+      const fyStart = company?.financialYearStart||"1st April"
+      const cycles = await robustGet<any[]>(`${BACKEND_URL}/salary-cycle/company/${selected.value}`)
+      let day = "1"
+      if(Array.isArray(cycles)&&cycles.length>0) day = cycles[0].monthStartDay||"1"
+      setFinancialYearOptions(buildFinancialYearOptions(fyStart,day))
+    }catch(e){ console.error(e); setFinancialYearOptions([])}
   }
 
-  const fetchManageHolidays = async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/manage-holiday`, {
-        cache: "no-store",
-      })
-      const data = await res.json()
-      return Array.isArray(data) ? data : []
-    } catch (error) {
-      console.error("Error fetching manage holidays:", error)
-      return []
-    }
-  }
-
-  // Load public holidays and holiday options on component mount
-  useEffect(() => {
-    loadPublicHolidays()
-    loadHolidayOptions()
-  }, [])
-
-  const loadHolidayOptions = async () => {
-    try {
-      const holidays = await fetchManageHolidays()
-      setHolidayOptions(holidays)
-    } catch (error) {
-      console.error("Error loading holiday options:", error)
-    }
-  }
-
-  const loadPublicHolidays = async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/public-holiday`, {
-        cache: "no-store",
-      })
-      const data = await res.json()
-      const publicHolidaysData = (Array.isArray(data) ? data : []).map(
-        (holiday: any) => ({
-          id: holiday.id.toString(),
-          serviceProviderID: holiday.serviceProviderID,
-          companyID: holiday.companyID,
-          branchesID: holiday.branchesID,
-          manageHolidayID: holiday.manageHolidayID,
-          serviceProvider: holiday.serviceProvider?.companyName || "",
-          companyName: holiday.company?.companyName || "",
-          branchName: holiday.branches?.branchName || "",
-          holidayName: holiday.manageHoliday?.holidayName || "",
-          financialYear: holiday.financialYear,
-          startDate: holiday.startDate
-            ? new Date(holiday.startDate).toISOString().split("T")[0]
-            : "",
-          endDate: holiday.endDate
-            ? new Date(holiday.endDate).toISOString().split("T")[0]
-            : "",
-          createdAt: holiday.createdAt
-            ? new Date(holiday.createdAt).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
-        })
-      )
-      setPublicHolidays(publicHolidaysData)
-    } catch (error) {
-      console.error("Error loading public holidays:", error)
-    }
-  }
-
-  const filteredHolidays = publicHolidays.filter(holiday =>
-    (holiday.serviceProvider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (holiday.companyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (holiday.branchName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    holiday.holidayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    holiday.financialYear.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async(e:React.FormEvent)=>{
     e.preventDefault()
-    
-    try {
-      const publicHolidayData = {
-        serviceProviderID: formData.serviceProviderID,
-        companyID: formData.companyID,
-        branchesID: formData.branchesID,
-        manageHolidayID: formData.manageHolidayID,
-        financialYear: formData.financialYear,
-        startDate: formData.startDate ? new Date(formData.startDate) : null,
-        endDate: formData.endDate ? new Date(formData.endDate) : null,
-      }
-
-      const url = editingHoliday
-        ? `${BACKEND_URL}/public-holiday/${editingHoliday.id}`
-        : `${BACKEND_URL}/public-holiday`
-      const method = editingHoliday ? "PATCH" : "POST"
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(publicHolidayData),
-      })
-      if (!res.ok) {
-        throw new Error(`Failed to save public holiday: ${res.status}`)
-      }
-
-      await loadPublicHolidays()
-    resetForm()
-    setIsDialogOpen(false)
-    } catch (error) {
-      console.error("Error saving public holiday:", error)
+    const data = {
+      serviceProviderID: formData.serviceProviderID,
+      companyID: formData.companyID,
+      branchesID: formData.branchesID,
+      manageHolidayID: formData.manageHolidayID,
+      financialYear: formData.financialYear,
+      startDate: formData.startDate?new Date(formData.startDate):null,
+      endDate: formData.endDate?new Date(formData.endDate):null,
     }
+    const url = editingHoliday?`${BACKEND_URL}/public-holiday/${editingHoliday.id}`:`${BACKEND_URL}/public-holiday`
+    const method = editingHoliday?"PATCH":"POST"
+    await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
+    await loadPublicHolidays()
+    resetForm(); setIsDialogOpen(false)
   }
 
-  const resetForm = () => {
-    setFormData({
-      serviceProvider: "",
-      companyName: "",
-      branchName: "",
-      holidayName: "",
-      financialYear: "",
-      startDate: "",
-      endDate: "",
-      serviceProviderID: undefined,
-      companyID: undefined,
-      branchesID: undefined,
-      manageHolidayID: undefined,
-    })
-    setEditingHoliday(null)
-  }
+  const resetForm=()=>{ setFormData({
+    serviceProvider:"",companyName:"",branchName:"",holidayName:"",financialYear:"",
+    startDate:"",endDate:"",serviceProviderID:undefined,companyID:undefined,branchesID:undefined,manageHolidayID:undefined
+  }); setEditingHoliday(null)}
 
-  const handleEdit = (holiday: PublicHoliday) => {
-    setFormData({
-      serviceProvider: holiday.serviceProvider || "",
-      companyName: holiday.companyName || "",
-      branchName: holiday.branchName || "",
-      holidayName: holiday.holidayName,
-      financialYear: holiday.financialYear,
-      startDate: holiday.startDate,
-      endDate: holiday.endDate,
-      serviceProviderID: holiday.serviceProviderID,
-      companyID: holiday.companyID,
-      branchesID: holiday.branchesID,
-      manageHolidayID: holiday.manageHolidayID,
-    })
-    setEditingHoliday(holiday)
-    setIsDialogOpen(true)
-  }
+  const handleEdit=(h:PublicHoliday)=>{ setFormData({
+    serviceProvider:h.serviceProvider||"",companyName:h.companyName||"",branchName:h.branchName||"",
+    holidayName:h.holidayName,financialYear:h.financialYear,startDate:h.startDate,endDate:h.endDate,
+    serviceProviderID:h.serviceProviderID,companyID:h.companyID,branchesID:h.branchesID,manageHolidayID:h.manageHolidayID
+  }); setEditingHoliday(h); if(h.companyID) handleCompanySelect({display:h.companyName||"",value:h.companyID,item:{}}); setIsDialogOpen(true)}
 
-  const handleDelete = async (id: string) => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/public-holiday/${id}`, {
-        method: "DELETE",
-      })
-      if (!res.ok) {
-        throw new Error(`Failed to delete public holiday: ${res.status}`)
-      }
-      await loadPublicHolidays()
-    } catch (error) {
-      console.error("Error deleting public holiday:", error)
-    }
-  }
+  const handleDelete=async(id:string)=>{ await fetch(`${BACKEND_URL}/public-holiday/${id}`,{method:"DELETE"}); await loadPublicHolidays() }
 
-  const handleServiceProviderSelect = (selected: SelectedItem) => {
-    setFormData((prev) => ({
-      ...prev,
-      serviceProvider: selected.display,
-      serviceProviderID: selected.value,
-    }))
-  }
-
-  const handleCompanySelect = (selected: SelectedItem) => {
-    setFormData((prev) => ({
-      ...prev,
-      companyName: selected.display,
-      companyID: selected.value,
-    }))
-  }
-
-  const handleBranchSelect = (selected: SelectedItem) => {
-    setFormData((prev) => ({
-      ...prev,
-      branchName: selected.display,
-      branchesID: selected.value,
-    }))
-  }
-
+  const filtered = publicHolidays.filter(h=>
+    (h.companyName||"").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (h.holidayName||"").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (h.financialYear||"").toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <div className="space-y-6 w-full max-w-6xl mx-auto px-4">
       {/* Header */}
       <div className="flex items-center justify-between w-full">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">Public Holiday</h1>
-          <p className="text-gray-600 mt-1 text-sm">Manage public holidays and special occasions</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 flex-shrink-0 text-sm px-3 py-2">
-                <Plus className="w-4 h-4 mr-1" />
-                Add Public Holiday
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingHoliday ? "Edit Public Holiday" : "Add New Public Holiday"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingHoliday 
-                    ? "Update the public holiday information below." 
-                    : "Fill in the details to add a new public holiday."
-                  }
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Organization Selection */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Organization Selection</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <SearchSuggestInput
-                      label="Service Provider"
-                      placeholder="Select Service Provider"
-                        value={formData.serviceProvider}
-                      onChange={(value) =>
-                        setFormData((prev) => ({ ...prev, serviceProvider: value }))
-                      }
-                      onSelect={handleServiceProviderSelect}
-                      fetchData={fetchServiceProviders}
-                      displayField="companyName"
-                      valueField="id"
-                        required
-                    />
-                    <SearchSuggestInput
-                      label="Company Name"
-                      placeholder="Select Company"
-                        value={formData.companyName}
-                      onChange={(value) =>
-                        setFormData((prev) => ({ ...prev, companyName: value }))
-                      }
-                      onSelect={handleCompanySelect}
-                      fetchData={fetchCompanies}
-                      displayField="companyName"
-                      valueField="id"
-                        required
-                    />
-                    <SearchSuggestInput
-                      label="Branch Name"
-                      placeholder="Select Branch"
-                        value={formData.branchName}
-                      onChange={(value) =>
-                        setFormData((prev) => ({ ...prev, branchName: value }))
-                      }
-                      onSelect={handleBranchSelect}
-                      fetchData={fetchBranches}
-                      displayField="branchName"
-                      valueField="id"
-                        required
-                    />
-                  </div>
-                </div>
+        <h1 className="text-2xl font-bold">Public Holiday</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild><Button onClick={resetForm} className="bg-blue-600">Add Public Holiday</Button></DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader><DialogTitle>{editingHoliday?"Edit":"Add New"} Public Holiday</DialogTitle></DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                <SearchSuggestInput label="Service Provider" placeholder="Select Service Provider" value={formData.serviceProvider} onChange={v=>setFormData(p=>({...p,serviceProvider:v}))} onSelect={s=>setFormData(p=>({...p,serviceProvider:s.display,serviceProviderID:s.value}))} fetchData={fetchServiceProviders} displayField="companyName" valueField="id" required/>
+                <SearchSuggestInput label="Company Name" placeholder="Select Company" value={formData.companyName} onChange={v=>setFormData(p=>({...p,companyName:v}))} onSelect={handleCompanySelect} fetchData={fetchCompanies} displayField="companyName" valueField="id" required/>
+                <SearchSuggestInput label="Branch Name" placeholder="Select Branch" value={formData.branchName} onChange={v=>setFormData(p=>({...p,branchName:v}))} onSelect={s=>setFormData(p=>({...p,branchName:s.display,branchesID:s.value}))} fetchData={fetchBranches} displayField="branchName" valueField="id" required/>
+              </div>
 
-                {/* Holiday Configuration */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Holiday Configuration</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="holidayName">Holiday Name *</Label>
-                      <select
-                        id="holidayName"
-                        value={formData.holidayName}
-                        onChange={(e) => {
-                          const selectedHoliday = holidayOptions.find(h => h.holidayName === e.target.value)
-                          setFormData(prev => ({ 
-                            ...prev, 
-                            holidayName: e.target.value,
-                            manageHolidayID: selectedHoliday?.id
-                          }))
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="">Select Holiday</option>
-                        {holidayOptions.map((holiday) => (
-                          <option key={holiday.id} value={holiday.holidayName}>{holiday.holidayName}</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500">Select from Manage Holiday</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="financialYear">Financial Year *</Label>
-                      <select
-                        id="financialYear"
-                        value={formData.financialYear}
-                        onChange={(e) => setFormData(prev => ({ ...prev, financialYear: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="">Select Financial Year</option>
-                        {financialYears.map((year) => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500">If start on 1 Jan - YYYY, If start on 1 Apr - YYYY-YY</p>
-                    </div>
-                  </div>
+              {/* Holiday Config */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Holiday Name *</Label>
+                  <select value={formData.holidayName} onChange={e=>{
+                    const sel=holidayOptions.find(h=>h.holidayName===e.target.value)
+                    setFormData(p=>({...p,holidayName:e.target.value,manageHolidayID:sel?.id}))
+                  }} required className="w-full border px-2 py-1">
+                    <option value="">Select Holiday</option>
+                    {holidayOptions.map(h=><option key={h.id} value={h.holidayName}>{h.holidayName}</option>)}
+                  </select>
                 </div>
-
-                {/* Date Configuration */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Date Configuration</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startDate">Start Date *</Label>
-                      <Input
-                        id="startDate"
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                        className="w-full"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="endDate">End Date *</Label>
-                      <Input
-                        id="endDate"
-                        type="date"
-                        value={formData.endDate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                        className="w-full"
-                        required
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <Label>Financial Year *</Label>
+                  <select value={formData.financialYear} onChange={e=>setFormData(p=>({...p,financialYear:e.target.value}))} required className="w-full border px-2 py-1" disabled={financialYearOptions.length===0}>
+                    <option value="">{financialYearOptions.length?"Select Year":"Select Company first"}</option>
+                    {financialYearOptions.map(opt=><option key={opt} value={opt}>{opt}</option>)}
+                  </select>
                 </div>
+              </div>
 
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                    {editingHoliday ? "Update Public Holiday" : "Add Public Holiday"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div><Label>Start Date *</Label><Input type="date" value={formData.startDate} onChange={e=>setFormData(p=>({...p,startDate:e.target.value}))} required/></div>
+                <div><Label>End Date *</Label><Input type="date" value={formData.endDate} onChange={e=>setFormData(p=>({...p,endDate:e.target.value}))} required/></div>
+              </div>
+
+              <DialogFooter><Button type="submit" className="bg-blue-600">{editingHoliday?"Update":"Add"} Public Holiday</Button></DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search and Table */}
       <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center space-x-4 w-full">
-            <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search public holidays..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full"
-              />
-            </div>
-            <Badge variant="secondary" className="px-3 py-1 flex-shrink-0">
-              {filteredHolidays.length} holidays
-            </Badge>
+        <CardContent>
+          <div className="flex items-center mb-4">
+            <Search className="w-4 h-4 mr-2 text-gray-400" />
+            <Input placeholder="Search holidays..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+            <Badge variant="secondary" className="ml-3">{filtered.length} holidays</Badge>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Public Holidays Table */}
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Icon icon="mdi:calendar-star" className="w-5 h-5" />
-            Public Holidays List
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 w-full">
-          <div className="overflow-x-auto w-full">
-            <Table className="w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">Service Provider</TableHead>
-                  <TableHead className="w-[120px]">Company Name</TableHead>
-                  <TableHead className="w-[120px]">Branch Name</TableHead>
-                  <TableHead className="w-[150px]">Holiday Name</TableHead>
-                  <TableHead className="w-[100px]">Financial Year</TableHead>
-                  <TableHead className="w-[100px]">Start Date</TableHead>
-                  <TableHead className="w-[100px]">End Date</TableHead>
-                  <TableHead className="w-[100px]">Created</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredHolidays.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <Icon icon="mdi:calendar-star" className="w-12 h-12 text-gray-300" />
-                        <p>No public holidays found</p>
-                        <p className="text-sm">Try adjusting your search criteria</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredHolidays.map((holiday) => (
-                    <TableRow key={holiday.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{holiday.serviceProvider}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.companyName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.branchName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.holidayName}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.financialYear}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.startDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.endDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{holiday.createdAt}</TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(holiday)}
-                            className="h-7 w-7 p-0"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(holiday.id)}
-                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <Table>
+            <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Holiday</TableHead><TableHead>Year</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+            <TableBody>{filtered.map(h=>
+              <TableRow key={h.id}>
+                <TableCell>{h.companyName}</TableCell>
+                <TableCell>{h.holidayName}</TableCell>
+                <TableCell>{h.financialYear}</TableCell>
+                <TableCell>{h.startDate}</TableCell>
+                <TableCell>{h.endDate}</TableCell>
+                <TableCell>
+                  <Button size="sm" variant="ghost" onClick={()=>handleEdit(h)}><Edit className="w-4 h-4"/></Button>
+                  <Button size="sm" variant="ghost" onClick={()=>handleDelete(h.id)} className="text-red-600"><Trash2 className="w-4 h-4"/></Button>
+                </TableCell>
+              </TableRow>)}</TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

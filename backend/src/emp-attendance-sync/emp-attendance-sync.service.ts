@@ -7,11 +7,7 @@ import { DeviceStatus, Prisma } from '@prisma/client';
 export class EmpAttendanceSyncService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Picks only processed='0', pre-marks them to '1' so they won't be refetched,
-   * maps to EmpAttendanceLogs rows, inserts them, all in a single transaction.
-   * If dryRun=true, nothing is written (no pre-mark, no insert).
-   */
+ 
   async sync(input: { take: number; dryRun: boolean }) {
     const { take, dryRun } = input;
 

@@ -46,6 +46,10 @@ interface AttendancePolicy {
   checkout_end_after_min: number;
   checkin_grace_time_min: number;
   min_work_hours_half_day_min: number;
+  max_late_check_in_time:number;
+  earlyCheckoutBeforeEndMin:number;
+   markAs?: string;
+  lateMarkCount?: string;
   allow_self_mark_attendance: boolean;
   allow_manager_update_ot: boolean;
   max_ot_hours_per_day_min: number;
@@ -78,13 +82,15 @@ export function AttendancePolicyManagement() {
     checkout_end_after_min: 0,
     checkin_grace_time_min: 0,
     min_work_hours_half_day_min: 0,
+    max_late_check_in_time:0,
+    earlyCheckoutBeforeEndMin:0,
+    markAs: "" as "Absent" | "Half Day" | "",
+    lateMarkCount: "",
     allow_self_mark_attendance: false,
     allow_manager_update_ot: false,
     max_ot_hours_per_day_min: 0,
   });
 
-  // API functions for search and suggest
-  // Use absolute URLs to backend (port 8000) and filter client-side by display fields
   const BACKEND_URL =
     process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -160,10 +166,14 @@ export function AttendancePolicyManagement() {
           branchName: policy.branches?.branchName || "",
           attendancePolicyName: policy.attendancePolicyName,
           workingHoursType: policy.workingHoursType,
+          markAs: (policy.markAs as "Absent" | "Half Day") ?? "",
+          lateMarkCount: policy.lateMarkCount,
           checkin_begin_before_min: policy.checkin_begin_before_min || 0,
           checkout_end_after_min: policy.checkout_end_after_min || 0,
           checkin_grace_time_min: policy.checkin_grace_time_min || 0,
           min_work_hours_half_day_min: policy.min_work_hours_half_day_min || 0,
+          max_late_check_in_time:policy.max_late_check_in_time || 0,
+          earlyCheckoutBeforeEndMin:policy.earlyCheckoutBeforeEndMin || 0,
           allow_self_mark_attendance: policy.allow_self_mark_attendance || false,
           allow_manager_update_ot: policy.allow_manager_update_ot || false,
           max_ot_hours_per_day_min: policy.max_ot_hours_per_day_min || 0,
@@ -207,7 +217,11 @@ export function AttendancePolicyManagement() {
         checkin_begin_before_min: formData.checkin_begin_before_min,
         checkout_end_after_min: formData.checkout_end_after_min,
         checkin_grace_time_min: formData.checkin_grace_time_min,
+        markAs:formData.markAs,
+        lateMarkCount:formData.lateMarkCount,
         min_work_hours_half_day_min: formData.min_work_hours_half_day_min,
+        max_late_check_in_time:formData.max_late_check_in_time,
+        earlyCheckoutBeforeEndMin:formData.earlyCheckoutBeforeEndMin,
         allow_self_mark_attendance: formData.allow_self_mark_attendance,
         allow_manager_update_ot: formData.allow_manager_update_ot,
         max_ot_hours_per_day_min: formData.max_ot_hours_per_day_min,
@@ -249,7 +263,11 @@ export function AttendancePolicyManagement() {
       checkin_begin_before_min: 0,
       checkout_end_after_min: 0,
       checkin_grace_time_min: 0,
+      markAs:"",
+      lateMarkCount:"",   
       min_work_hours_half_day_min: 0,
+      max_late_check_in_time:0,
+      earlyCheckoutBeforeEndMin:0,
       allow_self_mark_attendance: false,
       allow_manager_update_ot: false,
       max_ot_hours_per_day_min: 0,
@@ -294,7 +312,11 @@ export function AttendancePolicyManagement() {
       checkin_begin_before_min: policy.checkin_begin_before_min,
       checkout_end_after_min: policy.checkout_end_after_min,
       checkin_grace_time_min: policy.checkin_grace_time_min,
+      markAs: (policy.markAs as "Absent" | "Half Day") ?? "",
+      lateMarkCount:policy.lateMarkCount || "",
       min_work_hours_half_day_min: policy.min_work_hours_half_day_min,
+      max_late_check_in_time:policy.max_late_check_in_time,
+      earlyCheckoutBeforeEndMin:policy.earlyCheckoutBeforeEndMin,
       allow_self_mark_attendance: policy.allow_self_mark_attendance,
       allow_manager_update_ot: policy.allow_manager_update_ot,
       max_ot_hours_per_day_min: policy.max_ot_hours_per_day_min,
@@ -314,7 +336,6 @@ export function AttendancePolicyManagement() {
       await loadAttendancePolicies();
     } catch (error) {
       console.error("Error deleting attendance policy:", error);
-      // You might want to show an error message to the user here
     }
   };
 
@@ -440,7 +461,7 @@ export function AttendancePolicyManagement() {
                 <h3 className="text-lg font-semibold">Check-In/Check-Out Configuration</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="checkin_begin_before_min">Check-In Begin Before (Minutes) *</Label>
+                    <Label htmlFor="checkin_begin_before_min">Check-In Begin Before (Minutes)</Label>
                     <div className="flex items-center space-x-2">
                       <Input
                         id="checkin_begin_before_min"
@@ -460,6 +481,7 @@ export function AttendancePolicyManagement() {
                     </div>
                     <p className="text-xs text-gray-500">For Fixed and Flexible</p>
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="checkout_end_after_min">Check-Out End After (Minutes) *</Label>
                     <div className="flex items-center space-x-2">
@@ -489,7 +511,7 @@ export function AttendancePolicyManagement() {
                 <h3 className="text-lg font-semibold">Grace Time and Minimum Hours</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="checkin_grace_time_min">Check-In Grace Time (Minutes) *</Label>
+                    <Label htmlFor="checkin_grace_time_min">Check-In Grace Time (Minutes)</Label>
                     <div className="flex items-center space-x-2">
                       <Input
                         id="checkin_grace_time_min"
@@ -510,7 +532,7 @@ export function AttendancePolicyManagement() {
                     <p className="text-xs text-gray-500">For Fixed Shift</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="min_work_hours_half_day_min">Minimum Work Hours for Half Day (Minutes) *</Label>
+                    <Label htmlFor="min_work_hours_half_day_min">Minimum Work Hours for Half Day (Minutes)</Label>
                     <div className="flex items-center space-x-2">
                       <Input
                         id="min_work_hours_half_day_min"
@@ -530,8 +552,100 @@ export function AttendancePolicyManagement() {
                     </div>
                     <p className="text-xs text-gray-500">For Fixed and Flexible</p>
                   </div>
+                  
+
+
+
+
+
+
+                    <div className="space-y-2">
+                    <Label htmlFor="max_late_check_in_time">max_late_check_in_time</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        id="max_late_check_in_time"
+                        type="text"
+                        value={formData.max_late_check_in_time}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData((prev) => ({
+                            ...prev,
+                            max_late_check_in_time: parseInt(value) || 0,
+                          }));
+                        }}
+                        className="flex-1"
+                        required
+                      />
+                      <span className="text-sm text-gray-500">Min</span>
+                    </div>
+                    <p className="text-xs text-gray-500">For Fixed </p>
+                  </div>
+
+
+                    <div className="space-y-2">
+                    <Label htmlFor="earlyCheckoutBeforeEndMin">earlyCheckoutBeforeEndMin</Label>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        id="earlyCheckoutBeforeEndMin"
+                        type="text"
+                        value={formData.earlyCheckoutBeforeEndMin}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          setFormData((prev) => ({
+                            ...prev,
+                            earlyCheckoutBeforeEndMin: parseInt(value) || 0,
+                          }));
+                        }}
+                        className="flex-1"
+                        required
+                      />
+                      <span className="text-sm text-gray-500">Min</span>
+                    </div>
+                    <p className="text-xs text-gray-500">For Fixed </p>
+                  </div>
+
+
+
+
+
                 </div>
               </div>
+
+              <div className="flex items-center space-x-3">
+  <Label className="whitespace-nowrap">Mark as</Label>
+  <select
+    value={formData.markAs}
+    onChange={(e) =>
+      setFormData((p) => ({
+        ...p,
+        markAs: e.target.value as "Absent" | "Half Day" | "",
+      }))
+    }
+    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    required
+  >
+    <option value="">Select</option>
+    <option value="Absent">Absent</option>
+    <option value="Half Day">Half Day</option>
+  </select>
+
+  <Label className="whitespace-nowrap">After</Label>
+  <Input
+    type="text"
+    min={0}
+    value={formData.lateMarkCount}
+    onChange={(e) =>
+      setFormData((p) => ({
+        ...p,
+        lateMarkCount: e.target.value,
+      }))
+    }
+    className="w-20"
+    placeholder="0"
+  />
+
+  <Label className="whitespace-nowrap">Late Marks</Label>
+</div>
 
               {/* Employee Permissions */}
               <div className="space-y-4">
@@ -574,7 +688,7 @@ export function AttendancePolicyManagement() {
                   </label>
                   </div>
                   <div className="space-y-2">
-                  <Label htmlFor="max_ot_hours_per_day_min">Maximum OT Hours / Per Day (Minutes) *</Label>
+                  <Label htmlFor="max_ot_hours_per_day_min">Maximum OT Hours / Per Day (Minutes)</Label>
                   <div className="flex items-center space-x-2">
                       <Input
                       id="max_ot_hours_per_day_min"

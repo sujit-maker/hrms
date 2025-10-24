@@ -146,7 +146,7 @@ interface ManageEmpRead {
   
   // Basic position relations
   departments?: { id: ID; departmentName?: string | null } | null;
-  designations?: { id: ID; designantion?: string | null } | null;
+  designations?: { id: ID; desgination?: string | null } | null;
   manager?: { id: ID; employeeFirstName?: string | null; employeeLastName?: string | null } | null;
   workShift?: { id: ID; workShiftName?: string | null } | null;
   attendancePolicy?: { id: ID; attendancePolicyName?: string | null } | null;
@@ -225,7 +225,7 @@ async function resolveLabelsForEdit(
   // run all lookups but don't crash if any fails
   const results = await Promise.allSettled([
     fetchFirstById<{ id: ID; departmentName?: string | null }>(API.departments, r.departmentNameID),
-    fetchFirstById<{ id: ID; designantion?: string | null }>(API.designations, r.designationID),
+    fetchFirstById<{ id: ID; desgination?: string | null }>(API.designations, r.designationID),
     fetchFirstById<{ id: ID; employeeFirstName?: string | null; employeeLastName?: string | null }>(API.employees, r.managerID),
     fetchFirstById<{ id: ID; workShiftName?: string | null }>(API.workShifts, r.workShiftID),
     fetchFirstById<{ id: ID; attendancePolicyName?: string | null }>(API.attendancePolicies, r.attendancePolicyID),
@@ -239,7 +239,7 @@ async function resolveLabelsForEdit(
     results[i].status === "fulfilled" ? (results[i] as PromiseFulfilledResult<any>).value as T : fallback;
 
   const dept = get<{ departmentName?: string | null }>(0);
-  const desg = get<{ designantion?: string | null }>(1);
+  const desg = get<{ desgination?: string | null }>(1);
   const mgr = get<{ employeeFirstName?: string | null; employeeLastName?: string | null }>(2);
   const ws = get<{ workShiftName?: string | null }>(3);
   const ap = get<{ attendancePolicyName?: string | null }>(4);
@@ -271,7 +271,7 @@ async function resolveLabelsForEdit(
       deptAutocomplete: dept?.departmentName ?? prev.deptAutocomplete,
       contractorID: contractor?.id ?? prev.contractorID,
       contrAutocomplete: contractor?.contractorName ?? prev.contrAutocomplete,
-      desgAutocomplete: desg?.designantion ?? prev.desgAutocomplete,
+      desgAutocomplete: desg?.desgination ?? prev.desgAutocomplete,
       mgrAutocomplete: mgrFull || prev.mgrAutocomplete,
       wsAutocomplete: ws?.workShiftName ?? prev.wsAutocomplete,
       apAutocomplete: ap?.attendancePolicyName ?? prev.apAutocomplete,
@@ -543,7 +543,7 @@ export function ManageEmployeesManagement() {
       setDesgLoading(true);
       try {
         const all = await fetchJSONSafe<Desg[]>(API.designations, ctrl.signal);
-        const filtered = (all || []).filter(d => (d.designantion ?? "").toLowerCase().includes(q.toLowerCase()));
+        const filtered = (all || []).filter(d => (d.desgination ?? "").toLowerCase().includes(q.toLowerCase()));
         setDesgList(filtered.slice(0, 20));
       } finally { setDesgLoading(false); }
     }, DEBOUNCE_MS);
@@ -709,7 +709,7 @@ export function ManageEmployeesManagement() {
 
 
   interface Dept { id: ID; departmentName?: string | null; }
-  interface Desg { id: ID; designantion?: string | null; }
+  interface Desg { id: ID; desgination?: string | null; }
   interface Contr { id: ID; contractorName?: string | null; }
   interface Mgr { id: ID; employeeFirstName?: string | null; employeeLastName?: string | null; }
   interface WS { id: ID; workShiftName?: string | null; }
@@ -1648,13 +1648,13 @@ export function ManageEmployeesManagement() {
                             setFormData((p) => ({
                               ...p,
                               designationID: d.id,
-                              desgAutocomplete: d.designantion ?? String(d.id),
+                              desgAutocomplete: d.desgination ?? String(d.id),
                               promotion: { ...p.promotion, designationID: d.id },
                             }));
                             setDesgList([]);
                           }}
                         >
-                          {d.designantion}
+                          {d.desgination}
                         </div>
                       ))}
                     </div>
@@ -1909,19 +1909,7 @@ export function ManageEmployeesManagement() {
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Probation Period</Label>
-                    <Input
-                      value={formData.promotion.probationPeriod}
-                      onChange={(e) =>
-                        setFormData((p) => ({
-                          ...p,
-                          promotion: { ...p.promotion, probationPeriod: e.target.value },
-                        }))
-                      }
-                    />
-
-                  </div>
+                 
 
                 </div>
 
@@ -1973,51 +1961,7 @@ export function ManageEmployeesManagement() {
                 </div>
               </div>
 
-                <div ref={wsRef} className="space-y-2 relative">
-                  <Label>Work Shifts</Label>
-                  <Input
-                    value={formData.wsAutocomplete}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormData((p) => ({
-                        ...p,
-                        wsAutocomplete: val,
-                        workShiftID: null,
-                        promotion: { ...p.promotion, workShiftID: null },
-                      }));
-                      runFetchWS(val);
-                    }}
-                    onFocus={(e) => {
-                      const val = e.target.value;
-                      if (val.length >= MIN_CHARS) runFetchWS(val);
-                    }}
-                    placeholder="Start typing work shifts…"
-                    autoComplete="off"
-                  />
-                  {wsList.length > 0 && (
-                    <div className="absolute z-10 bg-white border rounded w-full shadow max-h-48 overflow-y-auto">
-                      {wsLoading && <div className="px-3 py-2 text-sm text-gray-500">Loading…</div>}
-                      {wsList.map((a) => (
-                        <div
-                          key={a.id}
-                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setFormData((p) => ({
-                              ...p,
-                              workShiftID: a.id,
-                              wsAutocomplete: a.workShiftName ?? String(a.id),
-                              promotion: { ...p.promotion, workShiftID: a.id },
-                            }));
-                            setWsList([]);
-                          }}
-                        >
-                          {a.workShiftName}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+             
 
               {/* Leave Policy and Work Shifts */}
               <div className="grid grid-cols-2 gap-4">
@@ -2670,7 +2614,7 @@ export function ManageEmployeesManagement() {
                       <TableCell className="whitespace-nowrap">{coName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{brName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.departments?.departmentName ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.designations?.designantion ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.designations?.desgination ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.employeeFirstName} {r.employeeLastName}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.employeeID ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.businessEmail ?? "—"}</TableCell>
