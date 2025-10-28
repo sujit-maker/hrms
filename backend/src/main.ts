@@ -15,7 +15,7 @@ async function bootstrap() {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
   app.enableCors({
-    origin: ['http://localhost:3000'],
+    origin: ['http://192.168.29.225:3000'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
@@ -27,7 +27,7 @@ async function bootstrap() {
     verify: (req: any, _res, buf) => { req._raw = buf?.toString('utf8') ?? ''; },
   }));
   await app.listen(8000, '0.0.0.0');
-  console.log('API listening on http://localhost:8000');
+  console.log('API listening on http://192.168.29.225:8000');
 
   // --- Raw/device listener (8080) ---
   const app8080 = await NestFactory.create(RawListenerModule, {
@@ -66,6 +66,6 @@ async function bootstrap() {
   });
 
   await app8080.listen(8080, '0.0.0.0');
-  console.log('Raw listener on http://localhost:8080');
+  console.log('Raw listener on http://192.168.29.225:8080');
 }
 bootstrap();

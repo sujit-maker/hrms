@@ -92,7 +92,7 @@ export function AttendancePolicyManagement() {
   });
 
   const BACKEND_URL =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.29.225:8000";
 
   const fetchServiceProviders = async (query: string) => {
     try {

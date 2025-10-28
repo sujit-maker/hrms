@@ -111,17 +111,17 @@ type SalaryCycleRow = {
    Constants / helpers
    ======================= */
 
-   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+   const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.29.225:8000";
 
 const API = {
-  sp: "http://localhost:8000/service-provider",
-  co: "http://localhost:8000/company",
-  br: "http://localhost:8000/branches",
-  emp: "http://localhost:8000/manage-emp",
-  salaryCycleByCompany: (companyId: number) => `http://localhost:8000/salary-cycle/company/${companyId}`,
-  generateSalary: "http://localhost:8000/generate-salary",
-  salaryAdvanceRepayment: "http://localhost:8000/salary-advance-repayment", // Add this
-  reimbursement: "http://localhost:8000/reimbursement", // Add this
+  sp: "http://192.168.29.225:8000/service-provider",
+  co: "http://192.168.29.225:8000/company",
+  br: "http://192.168.29.225:8000/branches",
+  emp: "http://192.168.29.225:8000/manage-emp",
+  salaryCycleByCompany: (companyId: number) => `http://192.168.29.225:8000/salary-cycle/company/${companyId}`,
+  generateSalary: "http://192.168.29.225:8000/generate-salary",
+  salaryAdvanceRepayment: "http://192.168.29.225:8000/salary-advance-repayment", // Add this
+  reimbursement: "http://192.168.29.225:8000/reimbursement", // Add this
 };
 
 const MIN_CHARS = 1;
@@ -303,7 +303,7 @@ async function robustGet(url: string) {
 
 /** Find a monthly pay grade for company + branch (or by emp.monthlyPayGradeID if present) */
 async function getMonthlyPayGrade(companyId: number, branchId: number, emp?: any) {
-  const grades: any[] = await robustGet("http://localhost:8000/monthly-pay-grade");
+  const grades: any[] = await robustGet("http://192.168.29.225:8000/monthly-pay-grade");
   if (emp?.monthlyPayGradeID) {
     const g = grades.find(x => x.id === emp.monthlyPayGradeID);
     if (g) return g;
@@ -315,8 +315,8 @@ async function getMonthlyPayGrade(companyId: number, branchId: number, emp?: any
 
 /** Get company + branch names */
 async function getCompanyAndBranch(companyId: number, branchId: number) {
-  const companies: any[] = await robustGet("http://localhost:8000/company");
-  const branches: any[] = await robustGet("http://localhost:8000/branches");
+  const companies: any[] = await robustGet("http://192.168.29.225:8000/company");
+  const branches: any[] = await robustGet("http://192.168.29.225:8000/branches");
   const company = companies.find((c: any) => c.id === companyId) || {};
   const branch = branches.find((b: any) => b.id === branchId) || {};
   return {
@@ -327,7 +327,7 @@ async function getCompanyAndBranch(companyId: number, branchId: number) {
 
 /** Get shift-days for an employee (to count weekly-off occurrences) */
 async function getShiftDays(emp: any) {
-  const workShifts: any[] = await robustGet("http://localhost:8000/work-shift");
+  const workShifts: any[] = await robustGet("http://192.168.29.225:8000/work-shift");
   const empShift = workShifts.find(ws => ws.id === emp.workShiftID);
   return empShift?.workShiftDay || [];
 }
@@ -345,7 +345,7 @@ function countWeeklyOffOccurrences(shiftDays: any[], start: Date, end: Date) {
 
 /** Public holiday days for branch within cycle */
 async function getHolidayCount(branchId: number, start: Date, end: Date) {
-  const holidays: any[] = await robustGet("http://localhost:8000/public-holiday");
+  const holidays: any[] = await robustGet("http://192.168.29.225:8000/public-holiday");
   const branchHolidays = holidays.filter((h: any) => h.branchesID === branchId);
   let set = new Set<string>();
   branchHolidays.forEach((h: any) => {
@@ -359,7 +359,7 @@ async function getHolidayCount(branchId: number, start: Date, end: Date) {
 
 /** Split approved leaves to Non-LoP vs LoP (in days) within cycle */
 async function getLeaveBreakdown(employeeId: number, start: Date, end: Date) {
-  const leaves: any[] = await robustGet("http://localhost:8000/leave-application");
+  const leaves: any[] = await robustGet("http://192.168.29.225:8000/leave-application");
   const empLeaves = leaves.filter(l => l.manageEmployeeID === employeeId && l.status === "Approved");
   let nonLoP = 0, lop = 0;
   empLeaves.forEach(l => {
@@ -448,7 +448,6 @@ async function getReimbursementAmount(employeeId: number, selectedMonthLabel: st
 }
 
 /** Compute earnings from Pay Grade + Reimbursements */
-/** Compute earnings from Pay Grade + Reimbursements */
 async function computeEarnings(gross: number, grade: any, employeeId: number, selectedMonthLabel: string) {
   const basic = Math.round(gross * 0.50);
   const allowances: { name: string, amount: number }[] = [];
@@ -534,7 +533,7 @@ async function computeDeductions(
 async function fetchAllLogs(): Promise<any[]> {
   const all: any[] = [];
   try {
-    const res: any[] = await robustGet(`http://localhost:8000/emp-attendance-logs`);
+    const res: any[] = await robustGet(`http://192.168.29.225:8000/emp-attendance-logs`);
     all.push(...res);
   } catch (err) {
     console.error("Failed to fetch /emp-attendance-logs", err);
@@ -600,7 +599,7 @@ async function calculateSalaryCounts(
     const endDate = new Date(`${eYear}-${monthNum(eMonth)}-${eDay}T23:59:59`);
 
     // ATTENDANCE POLICY
-    const policies: any[] = await robustGet("http://localhost:8000/attendance-policy");
+    const policies: any[] = await robustGet("http://192.168.29.225:8000/attendance-policy");
     const policy = policies.find((p: any) => p.id === emp.attendancePolicyID) ?? {};
     const workingTypeRaw = (policy?.workingHoursType ?? "").toString();
     const workingType = workingTypeRaw.toLowerCase().replace(/\s+/g, "");
@@ -616,7 +615,7 @@ async function calculateSalaryCounts(
     const markAsAction = (policy?.markAs ?? "Half Day").toString().toLowerCase();
 
     // WORK SHIFT
-    const workShifts: any[] = await robustGet("http://localhost:8000/work-shift");
+    const workShifts: any[] = await robustGet("http://192.168.29.225:8000/work-shift");
     const empShift = workShifts.find((ws: any) => ws.id === emp.workShiftID);
     const shiftDays: any[] = empShift?.workShiftDay ?? [];
     const weeklyOffDays = new Set(shiftDays.filter((d: any) => d.weeklyOff).map((d: any) => d.weekDay));
@@ -636,7 +635,7 @@ async function calculateSalaryCounts(
     };
 
     // HOLIDAYS
-    const holidays: any[] = await robustGet("http://localhost:8000/public-holiday");
+    const holidays: any[] = await robustGet("http://192.168.29.225:8000/public-holiday");
     const branchHolidays = holidays.filter((h: any) => h.branchesID === branchId);
     const holidaySet = new Set<string>();
     for (const h of branchHolidays) {
@@ -647,7 +646,7 @@ async function calculateSalaryCounts(
     }
 
     // LEAVES
-    const leaves: any[] = await robustGet("http://localhost:8000/leave-application");
+    const leaves: any[] = await robustGet("http://192.168.29.225:8000/leave-application");
     const empLeaves = leaves.filter((l) => l.manageEmployeeID === employeeId);
     const leaveMap = new Map<string, any>();
     for (const lv of empLeaves) {
@@ -674,7 +673,7 @@ async function calculateSalaryCounts(
     }
 
     // REGULARISATIONS
-    const regs: any[] = await robustGet("http://localhost:8000/emp-attendance-regularise");
+    const regs: any[] = await robustGet("http://192.168.29.225:8000/emp-attendance-regularise");
     const empRegs = regs.filter((r) => r.manageEmployeeID === employeeId && r.status === "Approved");
     const regulariseMap = new Map<string, any>();
     for (const r of empRegs) {
@@ -1123,7 +1122,7 @@ export function GenerateSalaryManagement() {
   useEffect(() => {
   if (formData.companyID) {
     (async () => {
-      const res = await robustGet("http://localhost:8000/salary-cycle");
+      const res = await robustGet("http://192.168.29.225:8000/salary-cycle");
       const filtered = res
         .filter((c: any) => c.companyID === Number(formData.companyID))
         .map((c: any) => `${c.startDay} ${c.startMonth} ${c.startYear} to ${c.endDay} ${c.endMonth} ${c.endYear}`);

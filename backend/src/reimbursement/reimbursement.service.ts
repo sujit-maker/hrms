@@ -69,7 +69,7 @@ export class ReimbursementService {
     return this.prisma.reimbursement.findMany({
       where: { manageEmployeeID: empId },
       include: this.includeRels(),
-      orderBy: { date: 'desc' },
+      orderBy: { id: 'desc' }, // Changed from date to id
     });
   }
 
@@ -77,7 +77,7 @@ export class ReimbursementService {
     return this.prisma.reimbursement.findMany({
       where: { companyID },
       include: this.includeRels(),
-      orderBy: { date: 'desc' },
+      orderBy: { id: 'desc' }, // Changed from date to id
     });
   }
 

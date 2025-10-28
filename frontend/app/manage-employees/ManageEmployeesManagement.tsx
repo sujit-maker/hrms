@@ -172,23 +172,23 @@ interface ManageEmpRead {
    Config & helpers
    ========================= */
 const API = {
-  manageEmp: "http://localhost:8000/manage-emp",
-  serviceProviders: "http://localhost:8000/service-provider",
-  companies: "http://localhost:8000/company",
-  branches: "http://localhost:8000/branches",
-  upload: "http://localhost:8000/files/upload",
+  manageEmp: "http://192.168.29.225:8000/manage-emp",
+  serviceProviders: "http://192.168.29.225:8000/service-provider",
+  companies: "http://192.168.29.225:8000/company",
+  branches: "http://192.168.29.225:8000/branches",
+  upload: "http://192.168.29.225:8000/files/upload",
 
   // NEW:
-  departments: "http://localhost:8000/departments",
-  designations: "http://localhost:8000/designations",
-  employees: "http://localhost:8000/manage-emp",
-  contractors: "http://localhost:8000/contractors",
-  workShifts: "http://localhost:8000/work-shift",
-  attendancePolicies: "http://localhost:8000/attendance-policy",
-  leavePolicies: "http://localhost:8000/leave-policy",
-  devices: "http://localhost:8000/devices",
-  monthlyGrades: "http://localhost:8000/monthly-pay-grade",
-  hourlyGrades: "http://localhost:8000/hourly-grade",
+  departments: "http://192.168.29.225:8000/departments",
+  designations: "http://192.168.29.225:8000/designations",
+  employees: "http://192.168.29.225:8000/manage-emp",
+  contractors: "http://192.168.29.225:8000/contractors",
+  workShifts: "http://192.168.29.225:8000/work-shift",
+  attendancePolicies: "http://192.168.29.225:8000/attendance-policy",
+  leavePolicies: "http://192.168.29.225:8000/leave-policy",
+  devices: "http://192.168.29.225:8000/devices",
+  monthlyGrades: "http://192.168.29.225:8000/monthly-pay-grade",
+  hourlyGrades: "http://192.168.29.225:8000/hourly-grade",
 
 };
 
@@ -835,7 +835,7 @@ export function ManageEmployeesManagement() {
     const res = await fetch(API.upload, { method: "POST", body: fd });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
-    const full = data?.url?.startsWith("http") ? data.url : `http://localhost:8000${data?.url ?? ""}`;
+    const full = data?.url?.startsWith("http") ? data.url : `http://192.168.29.225:8000${data?.url ?? ""}`;
     return full;
   };
 

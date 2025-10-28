@@ -115,7 +115,7 @@ const formatDbTime = (value: string | Date | null | undefined): string => {
   // API functions for search and suggest
   // Use absolute URLs to backend (port 8000) and filter client-side by display fields
   const BACKEND_URL =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.29.225:8000";
 
   const fetchServiceProviders = async (query: string) => {
     try {

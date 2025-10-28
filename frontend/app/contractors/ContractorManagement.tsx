@@ -85,11 +85,11 @@ interface Branch {
 // Config & helpers
 // ---------------------------
 const API = {
-  contractors: "http://localhost:8000/contractors",
-  serviceProviders: "http://localhost:8000/service-provider",
-  companies: "http://localhost:8000/company",
-  branches: "http://localhost:8000/branches",
-  upload: "http://localhost:8000/files/upload",
+  contractors: "http://192.168.29.225:8000/contractors",
+  serviceProviders: "http://192.168.29.225:8000/service-provider",
+  companies: "http://192.168.29.225:8000/company",
+  branches: "http://192.168.29.225:8000/branches",
+  upload: "http://192.168.29.225:8000/files/upload",
 };
 
 const MIN_CHARS = 1;
@@ -109,7 +109,7 @@ async function uploadFile(file: File): Promise<string> {
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   // return absolute URL if backend returns relative
-  return data.url?.startsWith("http") ? data.url : `http://localhost:8000${data.url}`;
+  return data.url?.startsWith("http") ? data.url : `http://192.168.29.225:8000${data.url}`;
 }
 
 // ---------------------------

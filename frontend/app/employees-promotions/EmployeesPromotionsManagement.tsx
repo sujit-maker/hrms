@@ -149,29 +149,29 @@ interface empPromotion {
 /** ========= API endpoints ========= */
 /** ========= API endpoints ========= */
 const API = {
-  serviceProviders: "http://localhost:8000/service-provider",
-  companies: "http://localhost:8000/company",
-  branches: "http://localhost:8000/branches",
-  manageEmp: "http://localhost:8000/manage-emp",
-  managers: "http://localhost:8000/manage-emp",
+  serviceProviders: "http://192.168.29.225:8000/service-provider",
+  companies: "http://192.168.29.225:8000/company",
+  branches: "http://192.168.29.225:8000/branches",
+  manageEmp: "http://192.168.29.225:8000/manage-emp",
+  managers: "http://192.168.29.225:8000/manage-emp",
 
   // ✅ fix typo + keep same path
-  workShifts: "http://localhost:8000/work-shift",
+  workShifts: "http://192.168.29.225:8000/work-shift",
 
 
   // ✅ add these three if your backend exposes them as below
-  attendancePolicies: "http://localhost:8000/attendance-policy",
-  leavePolicies: "http://localhost:8000/leave-policy",
-  empPromotion: "http://localhost:8000/emp-promotion",
+  attendancePolicies: "http://192.168.29.225:8000/attendance-policy",
+  leavePolicies: "http://192.168.29.225:8000/leave-policy",
+  empPromotion: "http://192.168.29.225:8000/emp-promotion",
 
 
   // ✅ add monthly/hourly grade endpoints (you mentioned these names earlier)
-  monthlyGrades: "http://localhost:8000/monthly-pay-grade",
-  hourlyGrades:  "http://localhost:8000/hourly-grade",
+  monthlyGrades: "http://192.168.29.225:8000/monthly-pay-grade",
+  hourlyGrades:  "http://192.168.29.225:8000/hourly-grade",
 
-  empCurrent: "http://localhost:8000/emp-current-position",
-  departments: "http://localhost:8000/departments",
-  designations: "http://localhost:8000/designations",
+  empCurrent: "http://192.168.29.225:8000/emp-current-position",
+  departments: "http://192.168.29.225:8000/departments",
+  designations: "http://192.168.29.225:8000/designations",
 };
 
 

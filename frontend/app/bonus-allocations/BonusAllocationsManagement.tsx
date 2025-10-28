@@ -17,11 +17,11 @@ import { Plus, Search, Edit, Trash2, Play } from "lucide-react";
 
 /* ---------------- API endpoints ---------------- */
 const API = {
-  allocations: "http://localhost:8000/bonus-allocation",
-  employees: "http://localhost:8000/manage-emp",
-  bonusSetups: "http://localhost:8000/bonus-setup",
-  companies: "http://localhost:8000/company",
-  salaryCycle: "http://localhost:8000/salary-cycle",
+  allocations: "http://192.168.29.225:8000/bonus-allocation",
+  employees: "http://192.168.29.225:8000/manage-emp",
+  bonusSetups: "http://192.168.29.225:8000/bonus-setup",
+  companies: "http://192.168.29.225:8000/company",
+  salaryCycle: "http://192.168.29.225:8000/salary-cycle",
 };
 const MIN_CHARS = 1;
 

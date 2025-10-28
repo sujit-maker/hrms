@@ -79,10 +79,10 @@ interface Branch {
 // ---------------------------
 
 const API = {
-  devices: "http://localhost:8000/devices",
-  serviceProviders: "http://localhost:8000/service-provider",
-  companies: "http://localhost:8000/company",
-  branches: "http://localhost:8000/branches",
+  devices: "http://192.168.29.225:8000/devices",
+  serviceProviders: "http://192.168.29.225:8000/service-provider",
+  companies: "http://192.168.29.225:8000/company",
+  branches: "http://192.168.29.225:8000/branches",
 };
 
 const MIN_CHARS = 1;

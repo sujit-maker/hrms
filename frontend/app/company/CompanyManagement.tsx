@@ -92,7 +92,7 @@ export function CompanyManagement() {
   }, [])
 
   const fetchCompanies = async () => {
-  const res = await fetch("http://localhost:8000/company");
+  const res = await fetch("http://192.168.29.225:8000/company");
   const json = await res.json();
   const list = Array.isArray(json) ? json : (json.data ?? []);
   setCompanies(list);
@@ -102,7 +102,7 @@ export function CompanyManagement() {
   // Fetch service providers for autocomplete
   const fetchServiceProviders = async (query: string) => {
     try {
-      const res = await fetch("http://localhost:8000/service-provider")
+      const res = await fetch("http://192.168.29.225:8000/service-provider")
       const data = await res.json()
       const filtered = data.filter((sp: ServiceProvider) =>
         sp.companyName.toLowerCase().includes(query.toLowerCase())
@@ -121,7 +121,7 @@ export function CompanyManagement() {
 
 
   // add once near your helpers/constants
-  const UPLOAD_URL = "http://localhost:8000/files/upload";
+  const UPLOAD_URL = "http://192.168.29.225:8000/files/upload";
 
   async function uploadImage(file: File): Promise<string> {
     const fd = new FormData();
@@ -165,12 +165,12 @@ export function CompanyManagement() {
 
       // 3) send JSON payload to your API
       const res = editingCompany
-        ? await fetch(`http://localhost:8000/company/${editingCompany.id}`, {
+        ? await fetch(`http://192.168.29.225:8000/company/${editingCompany.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(finalData),
         })
-        : await fetch("http://localhost:8000/company", {
+        : await fetch("http://192.168.29.225:8000/company", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(finalData),
@@ -209,7 +209,7 @@ export function CompanyManagement() {
   const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this company?")) {
       try {
-        await fetch(`http://localhost:8000/company/${id}`, { method: "DELETE" })
+        await fetch(`http://192.168.29.225:8000/company/${id}`, { method: "DELETE" })
         await fetchCompanies()
       } catch (error) {
         console.error("Error deleting company:", error)

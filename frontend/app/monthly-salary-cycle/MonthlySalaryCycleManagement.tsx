@@ -55,10 +55,10 @@ type BR = { id: number; branchName?: string | null };
 
 // ---- Config your API base here ----
 const API = {
-  salaryCycle: "http://localhost:8000/salary-cycle",
-  serviceProviders: "http://localhost:8000/service-provider",
-  companies: "http://localhost:8000/company",
-  branches: "http://localhost:8000/branches",
+  salaryCycle: "http://192.168.29.225:8000/salary-cycle",
+  serviceProviders: "http://192.168.29.225:8000/service-provider",
+  companies: "http://192.168.29.225:8000/company",
+  branches: "http://192.168.29.225:8000/branches",
 };
 
 const MIN_CHARS = 1;

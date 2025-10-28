@@ -939,6 +939,12 @@ model Reimbursement {
   description       String?
   status            String?          @default("Pending")
 
+  // 🔽 NEW FIELDS FOR APPROVAL SYSTEM
+  approvalType      String?          // "Salary" or "Voucher"
+  salaryPeriod      String?          // Only if approvalType is "Salary"
+  voucherCode       String?          // Only if approvalType is "Voucher"
+  voucherDate       String?          // Only if approvalType is "Voucher"
+
   // 🔽 NEW: items linked to a single reimbursement
   items             ReimbursementItem[]
 
@@ -952,9 +958,8 @@ model ReimbursementItem {
   id               Int    @id @default(autoincrement())
   reimbursementID  Int
   reimbursementType String?
-  amount            String?
-  description       String?
+  amount           String?
+  description      String?
 
   reimbursement    Reimbursement @relation(fields: [reimbursementID], references: [id], onDelete: Cascade)
 }
-

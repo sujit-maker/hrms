@@ -58,10 +58,10 @@ interface Branch { id: ID; branchName: string; }
 /* Config & helpers */
 // ---------------------------
 const API = {
-  designations: "http://localhost:8000/designations",
-  serviceProviders: "http://localhost:8000/service-provider",
-  companies: "http://localhost:8000/company",
-  branches: "http://localhost:8000/branches",
+  designations: "http://192.168.29.225:8000/designations",
+  serviceProviders: "http://192.168.29.225:8000/service-provider",
+  companies: "http://192.168.29.225:8000/company",
+  branches: "http://192.168.29.225:8000/branches",
 };
 
 const MIN_CHARS = 1;

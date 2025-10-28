@@ -36,6 +36,7 @@ export function PageLayout({ children }: PageLayoutProps) {
     leave: false,
     attendance: false,
     reports: false
+    
   })
 
   // Determine which section should be open based on current path
@@ -63,7 +64,7 @@ export function PageLayout({ children }: PageLayoutProps) {
       newOpenSections.payroll = true
     }
     // Salary Management section paths
-    else if (['/monthly-salary-cycle', '/salary-allowances', '/salary-deductions', '/monthly-pay-grade', '/salary-advance', '/bonus-setup', '/bonus-allocations', '/generate-salary'].includes(pathname)) {
+    else if (['/monthly-salary-cycle', '/salary-allowances', '/salary-deductions', '/monthly-pay-grade', '/salary-advance', '/reimbursement','/bonus-setup', '/bonus-allocations', '/generate-salary'].includes(pathname)) {
       newOpenSections.salary = true
     }
     // Leave Management section paths
@@ -77,6 +78,11 @@ export function PageLayout({ children }: PageLayoutProps) {
     // Reports section paths
     else if (['/attendance-reports', '/leave-reports', '/salary-statements'].includes(pathname)) {
       newOpenSections.reports = true
+    }
+
+    // Default behavior on dashboard (root) route: show Salary section
+    else if (pathname === '/') {
+      newOpenSections.salary = true
     }
 
     setOpenSections(newOpenSections)

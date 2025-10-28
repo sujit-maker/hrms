@@ -56,7 +56,7 @@ interface SelectedItem {
 }
 
 // Backend URL
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.29.225:8000"
 
 const mockLeaveTypes = [
   "Sick",
