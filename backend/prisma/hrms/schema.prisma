@@ -672,6 +672,7 @@ model ManageHoliday {
   companyID         Int?
   branchesID        Int?
   holidayName       String?          @db.VarChar
+  monthPeriod       String?          @db.VarChar  // Add this line
   branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)

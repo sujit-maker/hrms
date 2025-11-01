@@ -22,7 +22,7 @@ export class FilesController {
   )
   upload(@UploadedFile() file: Express.Multer.File) {
     // Return a publicly accessible URL for the saved file
-    // will be something like http://192.168.29.225:8000/uploads/<filename>
+    // will be something like http://localhost:8000/uploads/<filename>
     return { url: `/uploads/${file.filename}` };
   }
 }

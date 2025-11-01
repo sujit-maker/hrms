@@ -59,10 +59,10 @@ type BR = { id: number; branchName?: string | null };
 
 // ---- API endpoints ----
 const API = {
-  deduction: "http://192.168.29.225:8000/salary-deduction",
-  serviceProviders: "http://192.168.29.225:8000/service-provider",
-  companies: "http://192.168.29.225:8000/company",
-  branches: "http://192.168.29.225:8000/branches",
+  deduction: "http://localhost:8000/salary-deduction",
+  serviceProviders: "http://localhost:8000/service-provider",
+  companies: "http://localhost:8000/company",
+  branches: "http://localhost:8000/branches",
 };
 
 const MIN_CHARS = 1;
@@ -516,28 +516,7 @@ export function SalaryDeductionsManagement() {
                         : "Fixed amount in currency"}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="perMonthLimit">Per Month Limit *</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="perMonthLimit"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.perMonthLimit}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            perMonthLimit: parseFloat(e.target.value) || 0,
-                          }))
-                        }
-                        placeholder="0"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">₹</span>
-                    </div>
-                    <p className="text-xs text-gray-500">Maximum deduction per month</p>
-                  </div>
+                
                 </div>
               </div>
 

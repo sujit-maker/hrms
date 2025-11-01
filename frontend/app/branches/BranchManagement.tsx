@@ -81,9 +81,9 @@ interface Company {
 // Config & helpers
 // ---------------------------
 const API = {
-  branches: "http://192.168.29.225:8000/branches",
-  serviceProviders: "http://192.168.29.225:8000/service-provider",
-  companies: "http://192.168.29.225:8000/company",
+  branches: "http://localhost:8000/branches",
+  serviceProviders: "http://localhost:8000/service-provider",
+  companies: "http://localhost:8000/company",
 };
 
 const MIN_CHARS = 1;

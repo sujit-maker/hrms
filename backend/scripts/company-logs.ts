@@ -61,7 +61,7 @@ async function insertLog(companyId: number, log: any) {
 async function main() {
   console.log('🔄 Fetching logs from HRMS API...');
 
-  const res = await fetch('http://192.168.29.225:8000/emp-attendance-logs');
+  const res = await fetch('http://localhost:8000/emp-attendance-logs');
   if (!res.ok) {
     throw new Error(`Failed to fetch logs: ${res.status} ${res.statusText}`);
   }

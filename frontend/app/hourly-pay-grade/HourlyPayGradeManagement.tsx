@@ -15,10 +15,10 @@ import { Plus, Search, Edit, Trash2 } from "lucide-react";
 
 /* ---------- API endpoints ---------- */
 const API = {
-  hourly: "http://192.168.29.225:8000/hourly-pay-grade",
-  serviceProviders: "http://192.168.29.225:8000/service-provider",
-  companies: "http://192.168.29.225:8000/company",
-  branches: "http://192.168.29.225:8000/branches",
+  hourly: "http://localhost:8000/hourly-pay-grade",
+  serviceProviders: "http://localhost:8000/service-provider",
+  companies: "http://localhost:8000/company",
+  branches: "http://localhost:8000/branches",
 };
 
 const MIN_CHARS = 1;

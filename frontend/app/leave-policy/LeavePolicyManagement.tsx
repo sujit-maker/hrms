@@ -58,7 +58,7 @@ interface LeavePolicy {
 }
 
 // Holidays list fetched from Manage Holiday API (only holidayName is used)
-const BACKEND_URL = "http://192.168.29.225:8000"
+const BACKEND_URL = "http://localhost:8000"
 
 export function LeavePolicyManagement() {
   const [policies, setPolicies] = useState<LeavePolicy[]>([])
@@ -482,7 +482,7 @@ export function LeavePolicyManagement() {
                         placeholder="0"
                         required
                       />
-                      <span className="text-sm text-gray-500">Months</span>
+                      <span className="text-sm text-gray-500">Days</span>
                     </div>
                   </div>
                   <div className="space-y-2">

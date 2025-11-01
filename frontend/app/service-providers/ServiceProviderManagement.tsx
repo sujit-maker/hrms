@@ -37,7 +37,7 @@ interface ServiceProvider {
   contactNo: string
   emailAdd: string
   website: string
-  companyLogo: string
+  companyLogoUrl: string
   createdAt: string
 }
 
@@ -57,7 +57,7 @@ export function ServiceProviderManagement() {
     contactNo: "",
     emailAdd: "",
     website: "",
-    companyLogo: "",
+    companyLogoUrl: "",
   })
 
   // 🔹 Fetch providers on load
@@ -67,7 +67,7 @@ export function ServiceProviderManagement() {
 
   const fetchProviders = async () => {
     try {
-      const res = await fetch("http://192.168.29.225:8000/service-provider")
+      const res = await fetch("http://localhost:8000/service-provider")
       const data = await res.json()
       setServiceProviders(data)
     } catch (error) {
@@ -83,13 +83,13 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     let res
   if (editingProvider) {
-  res = await fetch(`http://192.168.29.225:8000/service-provider/${editingProvider.id}`, {
+  res = await fetch(`http://localhost:8000/service-provider/${editingProvider.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(formData),
   })
 } else {
-  res = await fetch("http://192.168.29.225:8000/service-provider", {
+  res = await fetch("http://localhost:8000/service-provider", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(formData),
@@ -116,7 +116,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   const handleDelete = async (id: number) => {
     if (confirm("Are you sure you want to delete this service provider?")) {
       try {
-        await fetch(`http://192.168.29.225:8000/service-provider/${id}`, {
+        await fetch(`http://localhost:8000/service-provider/${id}`, {
           method: "DELETE",
         })
         await fetchProviders()
@@ -136,7 +136,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       contactNo: provider.contactNo,
       emailAdd: provider.emailAdd,
       website: provider.website,
-      companyLogo: provider.companyLogo,
+      companyLogoUrl: provider.companyLogoUrl,
     })
     setEditingProvider(provider)
     setIsDialogOpen(true)
@@ -157,7 +157,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       contactNo: "",
       emailAdd: "",
       website: "",
-      companyLogo: "",
+      companyLogoUrl: "",
     })
     setEditingProvider(null)
   }

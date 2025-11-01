@@ -4,6 +4,6 @@ export class CreateManageHolidayDto {
   @IsOptional() @IsInt() serviceProviderID?: number;
   @IsOptional() @IsInt() companyID?: number;
   @IsOptional() @IsInt() branchesID?: number;
-
+  @IsOptional() @IsString() monthPeriod?: string;
   @IsOptional() @IsString() holidayName?: string;
 }

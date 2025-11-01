@@ -106,13 +106,13 @@ type BR = { id: number; branchName?: string | null };
 
 /* ---------- API endpoints ---------- */
 const API = {
-  mpg: "http://192.168.29.225:8000/monthly-pay-grade",
-  allowances: "http://192.168.29.225:8000/salary-allowance",
-  deductions: "http://192.168.29.225:8000/salary-deduction",
-  bonusAllocations: "http://192.168.29.225:8000/bonus-allocation", // New endpoint for bonuses
-  serviceProviders: "http://192.168.29.225:8000/service-provider",
-  companies: "http://192.168.29.225:8000/company",
-  branches: "http://192.168.29.225:8000/branches",
+  mpg: "http://localhost:8000/monthly-pay-grade",
+  allowances: "http://localhost:8000/salary-allowance",
+  deductions: "http://localhost:8000/salary-deduction",
+  bonusAllocations: "http://localhost:8000/bonus-allocation", // New endpoint for bonuses
+  serviceProviders: "http://localhost:8000/service-provider",
+  companies: "http://localhost:8000/company",
+  branches: "http://localhost:8000/branches",
 };
 
 const MIN_CHARS = 1;

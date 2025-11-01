@@ -366,7 +366,7 @@ export function PageLayout({ children }: PageLayoutProps) {
                        <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild>
                           <Link href="/salary-advance" className={`transition-all duration-200 rounded-md px-3 py-2 ${
-                            isActiveLink('/salary-allowances') 
+                            isActiveLink('/salary-advance') 
                               ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md' 
                               : 'text-blue-200 hover:text-white hover:bg-blue-700/50'
                           }`}>

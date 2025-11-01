@@ -67,7 +67,7 @@ interface SalaryCycle {
   companyID: number
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.29.225:8000"
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 // ---------- Financial Year and Salary Period Logic ----------
 const monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -1177,7 +1177,6 @@ const convertNumberToWords = (num: number): string => {
                 <TableHead>Company</TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Salary Period</TableHead>
-                <TableHead>Approval Type</TableHead>
                 <TableHead>Details</TableHead>
                 <TableHead>Items (Type → Amount)</TableHead>
                 <TableHead>Status</TableHead>
@@ -1190,13 +1189,7 @@ const convertNumberToWords = (num: number): string => {
                   <TableCell>{r.companyName}</TableCell>
                   <TableCell>{r.employeeName}</TableCell>
                   <TableCell>{r.date}</TableCell>
-                  <TableCell>
-                    {r.approvalType ? (
-                      <Badge variant="outline">{r.approvalType}</Badge>
-                    ) : (
-                      <span className="text-gray-400">Not set</span>
-                    )}
-                  </TableCell>
+                  
                   <TableCell>
                     {r.approvalType === "Salary" && r.salaryPeriod && (
                       <div className="text-sm">{r.salaryPeriod}</div>

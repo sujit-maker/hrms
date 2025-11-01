@@ -46,9 +46,9 @@ interface AttendancePolicy {
   checkout_end_after_min: number;
   checkin_grace_time_min: number;
   min_work_hours_half_day_min: number;
-  max_late_check_in_time:number;
-  earlyCheckoutBeforeEndMin:number;
-   markAs?: string;
+  max_late_check_in_time: number;
+  earlyCheckoutBeforeEndMin: number;
+  markAs?: string;
   lateMarkCount?: string;
   allow_self_mark_attendance: boolean;
   allow_manager_update_ot: boolean;
@@ -82,8 +82,8 @@ export function AttendancePolicyManagement() {
     checkout_end_after_min: 0,
     checkin_grace_time_min: 0,
     min_work_hours_half_day_min: 0,
-    max_late_check_in_time:0,
-    earlyCheckoutBeforeEndMin:0,
+    max_late_check_in_time: 0,
+    earlyCheckoutBeforeEndMin: 0,
     markAs: "" as "Absent" | "Half Day" | "",
     lateMarkCount: "",
     allow_self_mark_attendance: false,
@@ -92,7 +92,7 @@ export function AttendancePolicyManagement() {
   });
 
   const BACKEND_URL =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://192.168.29.225:8000";
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
   const fetchServiceProviders = async (query: string) => {
     try {
@@ -103,8 +103,8 @@ export function AttendancePolicyManagement() {
       const q = query.toLowerCase();
       return Array.isArray(data)
         ? data.filter((item: any) =>
-            (item?.companyName || "").toLowerCase().includes(q)
-          )
+          (item?.companyName || "").toLowerCase().includes(q)
+        )
         : [];
     } catch (error) {
       console.error("Error fetching service providers:", error);
@@ -119,8 +119,8 @@ export function AttendancePolicyManagement() {
       const q = query.toLowerCase();
       return Array.isArray(data)
         ? data.filter((item: any) =>
-            (item?.companyName || "").toLowerCase().includes(q)
-          )
+          (item?.companyName || "").toLowerCase().includes(q)
+        )
         : [];
     } catch (error) {
       console.error("Error fetching companies:", error);
@@ -135,8 +135,8 @@ export function AttendancePolicyManagement() {
       const q = query.toLowerCase();
       return Array.isArray(data)
         ? data.filter((item: any) =>
-            (item?.branchName || "").toLowerCase().includes(q)
-          )
+          (item?.branchName || "").toLowerCase().includes(q)
+        )
         : [];
     } catch (error) {
       console.error("Error fetching branches:", error);
@@ -172,8 +172,8 @@ export function AttendancePolicyManagement() {
           checkout_end_after_min: policy.checkout_end_after_min || 0,
           checkin_grace_time_min: policy.checkin_grace_time_min || 0,
           min_work_hours_half_day_min: policy.min_work_hours_half_day_min || 0,
-          max_late_check_in_time:policy.max_late_check_in_time || 0,
-          earlyCheckoutBeforeEndMin:policy.earlyCheckoutBeforeEndMin || 0,
+          max_late_check_in_time: policy.max_late_check_in_time || 0,
+          earlyCheckoutBeforeEndMin: policy.earlyCheckoutBeforeEndMin || 0,
           allow_self_mark_attendance: policy.allow_self_mark_attendance || false,
           allow_manager_update_ot: policy.allow_manager_update_ot || false,
           max_ot_hours_per_day_min: policy.max_ot_hours_per_day_min || 0,
@@ -217,11 +217,11 @@ export function AttendancePolicyManagement() {
         checkin_begin_before_min: formData.checkin_begin_before_min,
         checkout_end_after_min: formData.checkout_end_after_min,
         checkin_grace_time_min: formData.checkin_grace_time_min,
-        markAs:formData.markAs,
-        lateMarkCount:formData.lateMarkCount,
+        markAs: formData.markAs,
+        lateMarkCount: formData.lateMarkCount,
         min_work_hours_half_day_min: formData.min_work_hours_half_day_min,
-        max_late_check_in_time:formData.max_late_check_in_time,
-        earlyCheckoutBeforeEndMin:formData.earlyCheckoutBeforeEndMin,
+        max_late_check_in_time: formData.max_late_check_in_time,
+        earlyCheckoutBeforeEndMin: formData.earlyCheckoutBeforeEndMin,
         allow_self_mark_attendance: formData.allow_self_mark_attendance,
         allow_manager_update_ot: formData.allow_manager_update_ot,
         max_ot_hours_per_day_min: formData.max_ot_hours_per_day_min,
@@ -263,11 +263,11 @@ export function AttendancePolicyManagement() {
       checkin_begin_before_min: 0,
       checkout_end_after_min: 0,
       checkin_grace_time_min: 0,
-      markAs:"",
-      lateMarkCount:"",   
+      markAs: "",
+      lateMarkCount: "",
       min_work_hours_half_day_min: 0,
-      max_late_check_in_time:0,
-      earlyCheckoutBeforeEndMin:0,
+      max_late_check_in_time: 0,
+      earlyCheckoutBeforeEndMin: 0,
       allow_self_mark_attendance: false,
       allow_manager_update_ot: false,
       max_ot_hours_per_day_min: 0,
@@ -313,10 +313,10 @@ export function AttendancePolicyManagement() {
       checkout_end_after_min: policy.checkout_end_after_min,
       checkin_grace_time_min: policy.checkin_grace_time_min,
       markAs: (policy.markAs as "Absent" | "Half Day") ?? "",
-      lateMarkCount:policy.lateMarkCount || "",
+      lateMarkCount: policy.lateMarkCount || "",
       min_work_hours_half_day_min: policy.min_work_hours_half_day_min,
-      max_late_check_in_time:policy.max_late_check_in_time,
-      earlyCheckoutBeforeEndMin:policy.earlyCheckoutBeforeEndMin,
+      max_late_check_in_time: policy.max_late_check_in_time,
+      earlyCheckoutBeforeEndMin: policy.earlyCheckoutBeforeEndMin,
       allow_self_mark_attendance: policy.allow_self_mark_attendance,
       allow_manager_update_ot: policy.allow_manager_update_ot,
       max_ot_hours_per_day_min: policy.max_ot_hours_per_day_min,
@@ -365,8 +365,8 @@ export function AttendancePolicyManagement() {
                 {editingPolicy ? "Edit Attendance Policy" : "Add New Attendance Policy"}
               </DialogTitle>
               <DialogDescription>
-                {editingPolicy 
-                  ? "Update the attendance policy information below." 
+                {editingPolicy
+                  ? "Update the attendance policy information below."
                   : "Fill in the details to add a new attendance policy."}
               </DialogDescription>
             </DialogHeader>
@@ -382,7 +382,7 @@ export function AttendancePolicyManagement() {
                 <SearchSuggestInput
                   label="Service Provider"
                   placeholder="Select Service Provider"
-                    value={formData.serviceProvider}
+                  value={formData.serviceProvider}
                   onChange={(value) =>
                     setFormData((prev) => ({ ...prev, serviceProvider: value }))
                   }
@@ -390,12 +390,12 @@ export function AttendancePolicyManagement() {
                   fetchData={fetchServiceProviders}
                   displayField="companyName"
                   valueField="id"
-                    required
+                  required
                 />
                 <SearchSuggestInput
                   label="Company Name"
                   placeholder="Select Company"
-                    value={formData.companyName}
+                  value={formData.companyName}
                   onChange={(value) =>
                     setFormData((prev) => ({ ...prev, companyName: value }))
                   }
@@ -403,12 +403,12 @@ export function AttendancePolicyManagement() {
                   fetchData={fetchCompanies}
                   displayField="companyName"
                   valueField="id"
-                    required
+                  required
                 />
                 <SearchSuggestInput
                   label="Branch Name"
                   placeholder="Select Branch"
-                    value={formData.branchName}
+                  value={formData.branchName}
                   onChange={(value) =>
                     setFormData((prev) => ({ ...prev, branchName: value }))
                   }
@@ -416,7 +416,7 @@ export function AttendancePolicyManagement() {
                   fetchData={fetchBranches}
                   displayField="branchName"
                   valueField="id"
-                    required
+                  required
                 />
               </div>
 
@@ -437,9 +437,9 @@ export function AttendancePolicyManagement() {
               </div>
 
               {/* Working Hours Configuration */}
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <Label htmlFor="workingHoursType">Working Hours *</Label>
-                  <select
+                <select
                   id="workingHoursType"
                   value={formData.workingHoursType}
                   onChange={(e) =>
@@ -448,12 +448,12 @@ export function AttendancePolicyManagement() {
                       workingHoursType: e.target.value,
                     }))
                   }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="Fixed">Fixed</option>
-                    <option value="Flexible">Flexible</option>
-                  </select>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="Fixed">Fixed</option>
+                  <option value="Flexible">Flexible</option>
+                </select>
               </div>
 
               {/* Check-In/Check-Out Configuration */}
@@ -506,146 +506,150 @@ export function AttendancePolicyManagement() {
                 </div>
               </div>
 
-              {/* Grace Time and Minimum Hours */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Grace Time and Minimum Hours</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="checkin_grace_time_min">Check-In Grace Time (Minutes)</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        id="checkin_grace_time_min"
-                        type="text"
-                        value={formData.checkin_grace_time_min}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          setFormData((prev) => ({
-                            ...prev,
-                            checkin_grace_time_min: parseInt(value) || 0,
-                          }));
-                        }}
-                        className="flex-1"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">Min</span>
-                    </div>
-                    <p className="text-xs text-gray-500">For Fixed Shift</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="min_work_hours_half_day_min">Minimum Work Hours for Half Day (Minutes)</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        id="min_work_hours_half_day_min"
-                        type="text"
-                        value={formData.min_work_hours_half_day_min}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          setFormData((prev) => ({
-                            ...prev,
-                            min_work_hours_half_day_min: parseInt(value) || 0,
-                          }));
-                        }}
-                        className="flex-1"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">Min</span>
-                    </div>
-                    <p className="text-xs text-gray-500">For Fixed and Flexible</p>
-                  </div>
-                  
+             {/* Grace Time and Minimum Hours */}
+<div className="space-y-4">
+  <h3 className="text-lg font-semibold">Grace Time and Minimum Hours</h3>
+  <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="checkin_grace_time_min">Check-In Grace Time (Minutes)</Label>
+      <div className="flex items-center space-x-2">
+        <Input
+          id="checkin_grace_time_min"
+          type="text"
+          value={formData.checkin_grace_time_min}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, "");
+            setFormData((prev) => ({
+              ...prev,
+              checkin_grace_time_min: parseInt(value) || 0,
+            }));
+          }}
+          className="flex-1"
+          required={!formData.workingHoursType.includes("Flexible")}
+          disabled={formData.workingHoursType === "Flexible"}
+        />
+        <span className="text-sm text-gray-500">Min</span>
+      </div>
+      <p className="text-xs text-gray-500">
+        {formData.workingHoursType === "Flexible"
+          ? "Disabled for Flexible"
+          : "For Fixed Shift"}
+      </p>
+    </div>
 
+    <div className="space-y-2">
+      <Label htmlFor="min_work_hours_half_day_min">
+        Minimum Work Hours for Half Day (Minutes)
+      </Label>
+      <div className="flex items-center space-x-2">
+        <Input
+          id="min_work_hours_half_day_min"
+          type="text"
+          value={formData.min_work_hours_half_day_min}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, "");
+            setFormData((prev) => ({
+              ...prev,
+              min_work_hours_half_day_min: parseInt(value) || 0,
+            }));
+          }}
+          className="flex-1"
+          required
+        />
+        <span className="text-sm text-gray-500">Min</span>
+      </div>
+      <p className="text-xs text-gray-500">For Fixed and Flexible</p>
+    </div>
 
+    {/* Show these only if Fixed */}
+    {formData.workingHoursType === "Fixed" && (
+      <>
+        <div className="space-y-2">
+          <Label htmlFor="max_late_check_in_time">Max Late Check-In Time</Label>
+          <div className="flex items-center space-x-2">
+            <Input
+              id="max_late_check_in_time"
+              type="text"
+              value={formData.max_late_check_in_time}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, "");
+                setFormData((prev) => ({
+                  ...prev,
+                  max_late_check_in_time: parseInt(value) || 0,
+                }));
+              }}
+              className="flex-1"
+              required
+            />
+            <span className="text-sm text-gray-500">Min</span>
+          </div>
+          <p className="text-xs text-gray-500">For Fixed</p>
+        </div>
 
-
-
-
-                    <div className="space-y-2">
-                    <Label htmlFor="max_late_check_in_time">max_late_check_in_time</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        id="max_late_check_in_time"
-                        type="text"
-                        value={formData.max_late_check_in_time}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          setFormData((prev) => ({
-                            ...prev,
-                            max_late_check_in_time: parseInt(value) || 0,
-                          }));
-                        }}
-                        className="flex-1"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">Min</span>
-                    </div>
-                    <p className="text-xs text-gray-500">For Fixed </p>
-                  </div>
-
-
-                    <div className="space-y-2">
-                    <Label htmlFor="earlyCheckoutBeforeEndMin">earlyCheckoutBeforeEndMin</Label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        id="earlyCheckoutBeforeEndMin"
-                        type="text"
-                        value={formData.earlyCheckoutBeforeEndMin}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/\D/g, '');
-                          setFormData((prev) => ({
-                            ...prev,
-                            earlyCheckoutBeforeEndMin: parseInt(value) || 0,
-                          }));
-                        }}
-                        className="flex-1"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">Min</span>
-                    </div>
-                    <p className="text-xs text-gray-500">For Fixed </p>
-                  </div>
-
-
-
-
-
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3">
-  <Label className="whitespace-nowrap">Mark as</Label>
-  <select
-    value={formData.markAs}
-    onChange={(e) =>
-      setFormData((p) => ({
-        ...p,
-        markAs: e.target.value as "Absent" | "Half Day" | "",
-      }))
-    }
-    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    required
-  >
-    <option value="">Select</option>
-    <option value="Absent">Absent</option>
-    <option value="Half Day">Half Day</option>
-  </select>
-
-  <Label className="whitespace-nowrap">After</Label>
-  <Input
-    type="text"
-    min={0}
-    value={formData.lateMarkCount}
-    onChange={(e) =>
-      setFormData((p) => ({
-        ...p,
-        lateMarkCount: e.target.value,
-      }))
-    }
-    className="w-20"
-    placeholder="0"
-  />
-
-  <Label className="whitespace-nowrap">Late Marks</Label>
+        <div className="space-y-2">
+          <Label htmlFor="earlyCheckoutBeforeEndMin">Early Checkout Before End</Label>
+          <div className="flex items-center space-x-2">
+            <Input
+              id="earlyCheckoutBeforeEndMin"
+              type="text"
+              value={formData.earlyCheckoutBeforeEndMin}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, "");
+                setFormData((prev) => ({
+                  ...prev,
+                  earlyCheckoutBeforeEndMin: parseInt(value) || 0,
+                }));
+              }}
+              className="flex-1"
+              required
+            />
+            <span className="text-sm text-gray-500">Min</span>
+          </div>
+          <p className="text-xs text-gray-500">For Fixed</p>
+        </div>
+      </>
+    )}
+  </div>
 </div>
+
+{/* Mark As + Late Marks - Show only for Fixed */}
+{formData.workingHoursType === "Fixed" && (
+  <div className="flex items-center space-x-3">
+    <Label className="whitespace-nowrap">Mark as</Label>
+    <select
+      value={formData.markAs}
+      onChange={(e) =>
+        setFormData((p) => ({
+          ...p,
+          markAs: e.target.value as "Absent" | "Half Day" | "",
+        }))
+      }
+      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">Select</option>
+      <option value="Absent">Absent</option>
+      <option value="Half Day">Half Day</option>
+    </select>
+
+    <Label className="whitespace-nowrap">After</Label>
+    <Input
+      type="text"
+      min={0}
+      value={formData.lateMarkCount}
+      onChange={(e) =>
+        setFormData((p) => ({
+          ...p,
+          lateMarkCount: e.target.value,
+        }))
+      }
+      className="w-20"
+      placeholder="0"
+    />
+
+    <Label className="whitespace-nowrap">Late Marks</Label>
+  </div>
+)}
+
 
               {/* Employee Permissions */}
               <div className="space-y-4">
@@ -686,13 +690,13 @@ export function AttendancePolicyManagement() {
                     />
                     <span className="text-sm">Allow Manager to Update OT (Yes/No)</span>
                   </label>
-                  </div>
-                  <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="max_ot_hours_per_day_min">Maximum OT Hours / Per Day (Minutes)</Label>
                   <div className="flex items-center space-x-2">
-                      <Input
+                    <Input
                       id="max_ot_hours_per_day_min"
-                        type="text"
+                      type="text"
                       value={formData.max_ot_hours_per_day_min}
                       onChange={(e) => {
                         const value = e.target.value.replace(/\D/g, '');
@@ -702,9 +706,9 @@ export function AttendancePolicyManagement() {
                         }));
                       }}
                       className="flex-1"
-                        required
-                      />
-                      <span className="text-sm text-gray-500">Min</span>
+                      required
+                    />
+                    <span className="text-sm text-gray-500">Min</span>
                   </div>
                 </div>
               </div>
