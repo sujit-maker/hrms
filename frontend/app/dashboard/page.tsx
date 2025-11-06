@@ -46,7 +46,7 @@ export function HRManagementDashboard() {
   // Determine which section should be open based on current path
   useEffect(() => {
     const newOpenSections = {
-      setup: pathname === '/', // Dashboard page keeps setup open
+      setup: pathname === '/dashboard', // Dashboard page keeps setup open
       employee: false,
       payroll: false,
       salary: false,
@@ -753,3 +753,4 @@ export function HRManagementDashboard() {
     </div>
   );
 }
+export default HRManagementDashboard;

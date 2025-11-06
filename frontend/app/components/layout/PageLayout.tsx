@@ -81,7 +81,7 @@ export function PageLayout({ children }: PageLayoutProps) {
     }
 
     // Default behavior on dashboard (root) route: show Salary section
-    else if (pathname === '/') {
+    else if (pathname === '/dashboard') {
       newOpenSections.salary = true
     }
 

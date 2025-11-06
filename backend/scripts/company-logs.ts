@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client-open-access'; // use your open_access client
+import { PrismaClient } from "generated/prisma";
 
 const prisma = new PrismaClient();
 

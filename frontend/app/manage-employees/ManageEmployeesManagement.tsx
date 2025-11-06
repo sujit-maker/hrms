@@ -8,7 +8,7 @@ import {
 } from "../components/ui/select";
 
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -92,6 +92,17 @@ interface DevMapRead {
   device?: { id: ID; deviceName?: string | null } | null;
 }
 
+interface BankDetailsRead {
+  id: ID;
+  bankName?: string | null;
+  bankBranchName?: string | null;
+  accNumber?: string | null;
+  ifscCode?: string | null;
+  upi?: string | null;
+}
+  
+
+
 interface ManageEmpRead {
   id: ID;
   // FKs
@@ -146,7 +157,7 @@ interface ManageEmpRead {
   
   // Basic position relations
   departments?: { id: ID; departmentName?: string | null } | null;
-  designations?: { id: ID; desgination?: string | null } | null;
+  designations?: { id: ID; designation?: string | null } | null;
   manager?: { id: ID; employeeFirstName?: string | null; employeeLastName?: string | null } | null;
   workShift?: { id: ID; workShiftName?: string | null } | null;
   attendancePolicy?: { id: ID; attendancePolicyName?: string | null } | null;
@@ -158,6 +169,8 @@ interface ManageEmpRead {
   empEduQualification?: EduRead[];
   empProfExprience?: ExpRead[];
   empDeviceMapping?: DevMapRead[];
+  bankDetails?: BankDetailsRead[];
+  employeeBankDetails?: BankDetailsRead[];
 
   createdAt?: string | null;
 
@@ -218,14 +231,14 @@ async function fetchFirstById<T extends { id: number }>(url: string, id?: number
 
 async function resolveLabelsForEdit(
   r: ManageEmpRead,
-  setFormData: React.Dispatch<React.SetStateAction<any>>
+  setFormData: Dispatch<SetStateAction<any>>
 ) {
   // Prefer explicit IDs; fall back to related object IDs if present
   const contractorId = (r as any)?.contractorID ?? (r as any)?.contractor?.id ?? null;
   // run all lookups but don't crash if any fails
   const results = await Promise.allSettled([
     fetchFirstById<{ id: ID; departmentName?: string | null }>(API.departments, r.departmentNameID),
-    fetchFirstById<{ id: ID; desgination?: string | null }>(API.designations, r.designationID),
+    fetchFirstById<{ id: ID; designation?: string | null }>(API.designations, r.designationID),
     fetchFirstById<{ id: ID; employeeFirstName?: string | null; employeeLastName?: string | null }>(API.employees, r.managerID),
     fetchFirstById<{ id: ID; workShiftName?: string | null }>(API.workShifts, r.workShiftID),
     fetchFirstById<{ id: ID; attendancePolicyName?: string | null }>(API.attendancePolicies, r.attendancePolicyID),
@@ -239,7 +252,7 @@ async function resolveLabelsForEdit(
     results[i].status === "fulfilled" ? (results[i] as PromiseFulfilledResult<any>).value as T : fallback;
 
   const dept = get<{ departmentName?: string | null }>(0);
-  const desg = get<{ desgination?: string | null }>(1);
+  const desg = get<{ designation?: string | null }>(1);
   const mgr = get<{ employeeFirstName?: string | null; employeeLastName?: string | null }>(2);
   const ws = get<{ workShiftName?: string | null }>(3);
   const ap = get<{ attendancePolicyName?: string | null }>(4);
@@ -271,7 +284,7 @@ async function resolveLabelsForEdit(
       deptAutocomplete: dept?.departmentName ?? prev.deptAutocomplete,
       contractorID: contractor?.id ?? prev.contractorID,
       contrAutocomplete: contractor?.contractorName ?? prev.contrAutocomplete,
-      desgAutocomplete: desg?.desgination ?? prev.desgAutocomplete,
+      desgAutocomplete: desg?.designation ?? prev.desgAutocomplete,
       mgrAutocomplete: mgrFull || prev.mgrAutocomplete,
       wsAutocomplete: ws?.workShiftName ?? prev.wsAutocomplete,
       apAutocomplete: ap?.attendancePolicyName ?? prev.apAutocomplete,
@@ -376,11 +389,22 @@ export function ManageEmployeesManagement() {
     deviceName?: string;    // optional display only (if you want to show)
     _devAutocomplete?: string; // for device autocomplete input
   };
+  type BankDetailsForm = {
+    id?: ID;
+    _localId: string;
+    bankName: string;
+    bankBranchName: string;
+    accNumber: string;
+    ifscCode: string;
+    upi: string;
+  };
 
   // Track original child IDs to compute deletions on PATCH
   const [originalEduIds, setOriginalEduIds] = useState<ID[]>([]);
   const [originalExpIds, setOriginalExpIds] = useState<ID[]>([]);
   const [originalDevMapIds, setOriginalDevMapIds] = useState<ID[]>([]);
+  
+  const [originalBankDetailIds, setOriginalBankDetailIds] = useState<ID[]>([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -458,6 +482,7 @@ export function ManageEmployeesManagement() {
     eduForm: [] as EduForm[],
     expForm: [] as ExpForm[],
     devMapForm: [] as DevMapForm[],
+    bankDetailsForm: [] as BankDetailsForm[],
   });
 
   /* ===========
@@ -543,7 +568,7 @@ export function ManageEmployeesManagement() {
       setDesgLoading(true);
       try {
         const all = await fetchJSONSafe<Desg[]>(API.designations, ctrl.signal);
-        const filtered = (all || []).filter(d => (d.desgination ?? "").toLowerCase().includes(q.toLowerCase()));
+        const filtered = (all || []).filter(d => (d.designation ?? "").toLowerCase().includes(q.toLowerCase()));
         setDesgList(filtered.slice(0, 20));
       } finally { setDesgLoading(false); }
     }, DEBOUNCE_MS);
@@ -709,7 +734,7 @@ export function ManageEmployeesManagement() {
 
 
   interface Dept { id: ID; departmentName?: string | null; }
-  interface Desg { id: ID; desgination?: string | null; }
+  interface Desg { id: ID; designation?: string | null; }
   interface Contr { id: ID; contractorName?: string | null; }
   interface Mgr { id: ID; employeeFirstName?: string | null; employeeLastName?: string | null; }
   interface WS { id: ID; workShiftName?: string | null; }
@@ -864,6 +889,13 @@ export function ManageEmployeesManagement() {
       deviceID: "", deviceEmpCode: "", deviceName: "", _devAutocomplete: "",
     }]
   }));
+  const addBankDetail = () => setFormData(p => ({
+    ...p,
+    bankDetailsForm: [...p.bankDetailsForm, {
+      _localId: uid(),
+      bankName: "", bankBranchName: "", accNumber: "", ifscCode: "", upi: "",
+    }]
+  }));
 
   // Remove row (UI)
   const removeEdu = (lid: string) => setFormData(p => ({ ...p, eduForm: p.eduForm.filter(x => x._localId !== lid) }));
@@ -877,6 +909,12 @@ export function ManageEmployeesManagement() {
     setFormData(p => ({ ...p, expForm: p.expForm.map(x => x._localId === lid ? { ...x, [key]: val } : x) }));
   const updateDevMap = (lid: string, key: keyof DevMapForm, val: string) =>
     setFormData(p => ({ ...p, devMapForm: p.devMapForm.map(x => x._localId === lid ? { ...x, [key]: val } : x) }));
+  const updateBankDetail = (lid: string, key: keyof BankDetailsForm, val: string) =>
+    setFormData(p => ({ ...p, bankDetailsForm: p.bankDetailsForm.map(x => x._localId === lid ? { ...x, [key]: val } : x) }));
+  const removeBankDetail = (lid: string) =>
+    setFormData(p => ({ ...p, bankDetailsForm: p.bankDetailsForm.filter(x => x._localId !== lid) }));
+
+  
 
   /* ===============
      Form helpers
@@ -954,10 +992,12 @@ export function ManageEmployeesManagement() {
       eduForm: [],
       expForm: [],
       devMapForm: [],
+      bankDetailsForm: [],
     });
     setPhotoFile(null);
     setPhotoPreview(null);
     setOriginalEduIds([]); setOriginalExpIds([]); setOriginalDevMapIds([]);
+    setOriginalBankDetailIds([]);
     setEditingRow(null);
     setSpList([]); setCoList([]); setBrList([]);
     setError(null);
@@ -976,30 +1016,14 @@ export function ManageEmployeesManagement() {
     r.branches?.branchName ?? r.branchName ?? "—";
 
 
+  // removed ad-hoc nested change helpers (replaced by typed handlers)
 
 
   /* ===============
      CRUD submit
      =============== */
   // Only create/update promotion when meaningful fields are filled
-  const hasPromotionData = () => {
-    const p = formData.promotion as any;
-    if (!p) return false;
-    return Boolean(
-      p?.departmentNameID ||
-      p?.designationID ||
-      p?.managerID ||
-      (p?.employmentType && String(p.employmentType).trim() !== "") ||
-      (p?.employmentStatus && String(p.employmentStatus).trim() !== "") ||
-      (p?.probationPeriod && String(p.probationPeriod).trim() !== "") ||
-      p?.workShiftID != null ||
-      p?.attendancePolicyID != null ||
-      p?.leavePolicyID != null ||
-      (p?.salaryPayGradeType && String(p.salaryPayGradeType).trim() !== "") ||
-      p?.monthlyPayGradeID != null ||
-      p?.hourlyPayGradeID != null
-    );
-  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -1037,10 +1061,20 @@ export function ManageEmployeesManagement() {
         deviceEmpCode: d.deviceEmpCode || undefined,
       }));
 
+      const bankDetails = formData.bankDetailsForm.map(b => ({
+        id: b.id,
+        bankName: b.bankName || undefined,
+        bankBranchName: b.bankBranchName || undefined,
+        accNumber: b.accNumber || undefined,
+        ifscCode: b.ifscCode || undefined,
+        upi: b.upi || undefined,
+      }));
+
       // Compute deletions (edit only)
       const eduRemaining = new Set(edu.filter(e => e.id != null).map(e => e.id as number));
       const expRemaining = new Set(exp.filter(x => x.id != null).map(x => x.id as number));
       const devRemaining = new Set(devices.filter(d => d.id != null).map(d => d.id as number));
+      const bankRemaining = new Set(bankDetails.filter((b: { id?: number }) => b.id != null).map((b: { id?: number }) => b.id as number));
 
       const type = formData.promotion?.salaryPayGradeType;
 
@@ -1095,16 +1129,18 @@ export function ManageEmployeesManagement() {
         edu,
         exp,
         devices, // <-- IMPORTANT: send as `devices`, not empDeviceMapping
+        bankDetails,
 
         // Do not send promotion data from ManageEmployee form
         // Promotion records should only be created via Employee Promotions form
 
         // Deletions when editing (names expected by UpdateManageEmployeeDto)
         ...(editingRow ? {
-          eduIdsToDelete: originalEduIds.filter(id => !eduRemaining.has(id)),
-          expIdsToDelete: originalExpIds.filter(id => !expRemaining.has(id)),
-          deviceMapIdsToDelete: originalDevMapIds.filter(id => !devRemaining.has(id)), // <-- correct key
-        } : {}),
+  eduIdsToDelete: originalEduIds.filter(id => !eduRemaining.has(id)),
+  expIdsToDelete: originalExpIds.filter(id => !expRemaining.has(id)),
+  deviceMapIdsToDelete: originalDevMapIds.filter(id => !devRemaining.has(id)),
+  bankDetailsIdsToDelete: originalBankDetailIds.filter(id => !bankRemaining.has(id)), // ✅ fixed plural
+} : {}),
       };
 
       console.log("SUBMIT PAYLOAD", payload);
@@ -1167,6 +1203,17 @@ export function ManageEmployeesManagement() {
       deviceID: (d.deviceID ?? "").toString(),
       deviceEmpCode: d.deviceEmpCode ?? "",
       deviceName: d.device?.deviceName ?? "",
+    }));
+
+    const bankSource: BankDetailsRead[] = (r.employeeBankDetails ?? r.bankDetails ?? []) as BankDetailsRead[];
+    const bankDetailsForm: BankDetailsForm[] = bankSource.map((b): BankDetailsForm => ({
+      id: b.id,
+      _localId: uid(),
+      bankName: b.bankName ?? "",
+      bankBranchName: b.bankBranchName ?? "",
+      accNumber: b.accNumber ?? "",
+      ifscCode: b.ifscCode ?? "",
+      upi: b.upi ?? "",
     }));
 
     const latestPromotion =
@@ -1274,6 +1321,7 @@ export function ManageEmployeesManagement() {
       eduForm,
       expForm,
       devMapForm,
+      bankDetailsForm,
     });
 
     (async () => {
@@ -1312,6 +1360,7 @@ export function ManageEmployeesManagement() {
     setOriginalEduIds(eduForm.filter(x => x.id != null).map(x => x.id!));
     setOriginalExpIds(expForm.filter(x => x.id != null).map(x => x.id!));
     setOriginalDevMapIds(devMapForm.filter(x => x.id != null).map(x => x.id!));
+    setOriginalBankDetailIds(bankDetailsForm.filter(x => x.id != null).map(x => x.id!));
 
     setPhotoFile(null);
     setPhotoPreview(null);
@@ -1614,9 +1663,9 @@ export function ManageEmployeesManagement() {
 
 
 
-                {/* Designation */}
+                {/* designation */}
                 <div ref={desgRef} className="space-y-2 relative">
-                  <Label>Designation</Label>
+                  <Label>designation</Label>
                   <Input
                     value={formData.desgAutocomplete}
                     onChange={(e) => {
@@ -1648,13 +1697,13 @@ export function ManageEmployeesManagement() {
                             setFormData((p) => ({
                               ...p,
                               designationID: d.id,
-                              desgAutocomplete: d.desgination ?? String(d.id),
+                              desgAutocomplete: d.designation ?? String(d.id),
                               promotion: { ...p.promotion, designationID: d.id },
                             }));
                             setDesgList([]);
                           }}
                         >
-                          {d.desgination}
+                          {d.designation}
                         </div>
                       ))}
                     </div>
@@ -2343,7 +2392,7 @@ export function ManageEmployeesManagement() {
                           <Input value={xp.orgName} onChange={(e) => updateExp(xp._localId, "orgName", e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                          <Label>Designation</Label>
+                          <Label>designation</Label>
                           <Input value={xp.designation} onChange={(e) => updateExp(xp._localId, "designation", e.target.value)} />
                         </div>
                         <div className="space-y-2">
@@ -2370,6 +2419,66 @@ export function ManageEmployeesManagement() {
                   ))
                 )}
               </div>
+
+              {/* ==========================
+                  BANK DETAILS (repeater)
+                  ========================== */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Bank Details</h3>
+                  <Button variant="outline" size="sm" type="button" onClick={addBankDetail}>
+                    <Plus className="w-4 h-4 mr-1" /> Add Bank
+                  </Button>
+                </div>
+
+                {formData.bankDetailsForm.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 border border-gray-200 rounded-lg">
+                    <Icon icon="mdi:bank" className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p>No bank details added yet</p>
+                  </div>
+                ) : (
+                  formData.bankDetailsForm.map((bk) => (
+                    <div key={bk._localId} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-gray-900">Bank</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeBankDetail(bk._localId)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-4">
+                        <div className="space-y-2">
+                          <Label>Bank Name</Label>
+                          <Input value={bk.bankName} onChange={(e) => updateBankDetail(bk._localId, "bankName", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Branch Name</Label>
+                          <Input value={bk.bankBranchName} onChange={(e) => updateBankDetail(bk._localId, "bankBranchName", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Account Number</Label>
+                          <Input value={bk.accNumber} onChange={(e) => updateBankDetail(bk._localId, "accNumber", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>IFSC Code</Label>
+                          <Input value={bk.ifscCode} onChange={(e) => updateBankDetail(bk._localId, "ifscCode", e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>UPI</Label>
+                          <Input value={bk.upi} onChange={(e) => updateBankDetail(bk._localId, "upi", e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
 
               {/* ==========================
                   DEVICE MAPPING (repeater)
@@ -2539,6 +2648,22 @@ export function ManageEmployeesManagement() {
                 </div>
               )}
 
+              {(((viewRow.employeeBankDetails?.length ?? 0) > 0) || ((viewRow.bankDetails?.length ?? 0) > 0)) && (
+                <div className="mt-2">
+                  <p className="font-semibold">Bank Details:</p>
+                  <div className="text-sm space-y-1">
+                    {((viewRow.employeeBankDetails ?? viewRow.bankDetails ?? []) as BankDetailsRead[]).map((b: BankDetailsRead) => (
+                      <div key={b.id} className="border rounded p-2">
+                        <div><strong>Bank:</strong> {b.bankName ?? ""} {b.bankBranchName ? `— ${b.bankBranchName}` : ""}</div>
+                        <div><strong>Account:</strong> {b.accNumber ?? ""}</div>
+                        <div><strong>IFSC:</strong> {b.ifscCode ?? ""}</div>
+                        <div><strong>UPI:</strong> {b.upi ?? ""}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {viewRow.employeePhotoUrl && (
                 <div className="mt-2">
                   <img src={viewRow.employeePhotoUrl} className="h-24 w-24 rounded object-cover" alt="employee" />
@@ -2589,7 +2714,7 @@ export function ManageEmployeesManagement() {
                   <TableHead className="w-[120px]">Company</TableHead>
                   <TableHead className="w-[110px]">Branch</TableHead>
                   <TableHead className="w-[140px]">Department</TableHead>
-                  <TableHead className="w-[140px]">Designation</TableHead>
+                  <TableHead className="w-[140px]">designation</TableHead>
                   <TableHead className="w-[180px]">Name</TableHead>
                   <TableHead className="w-[120px]">Employee ID</TableHead>
                   <TableHead className="w-[160px]">Business Email</TableHead>
@@ -2614,7 +2739,7 @@ export function ManageEmployeesManagement() {
                       <TableCell className="whitespace-nowrap">{coName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{brName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.departments?.departmentName ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{r.designations?.desgination ?? "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.designations?.designation ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.employeeFirstName} {r.employeeLastName}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.employeeID ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{r.businessEmail ?? "—"}</TableCell>

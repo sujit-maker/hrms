@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { useCurrentUser } from "../hooks/useCurrentUser"
+
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
@@ -23,7 +25,6 @@ import {
   TableRow,
 } from "../components/ui/table"
 import { Badge } from "../components/ui/badge"
-import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2 } from "lucide-react"
 import { SearchSuggestInput } from "../components/SearchSuggestInput"
 
@@ -94,7 +95,9 @@ export function PublicHolidayManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState<PublicHoliday | null>(null)
   const [holidayOptions, setHolidayOptions] = useState<any[]>([])
-  const [financialYearOptions,setFinancialYearOptions] = useState<string[]>([])
+  const [financialYearOptions, setFinancialYearOptions] = useState<string[]>([])
+  const user = useCurrentUser()
+  const canManage = user?.role === "SUPERADMIN" || user?.role === "MANAGER"
 
   const [formData, setFormData] = useState({
     serviceProvider: "",
@@ -130,26 +133,84 @@ export function PublicHolidayManagement() {
   }
   const fetchManageHolidays = async ()=> robustGet<any[]>(`${BACKEND_URL}/manage-holiday`)
 
-  useEffect(()=>{ loadPublicHolidays(); loadHolidayOptions() },[])
+  useEffect(() => {
+    if (user) {
+      loadPublicHolidays()
+      loadHolidayOptions()
+    }
+  }, [user])
 
   const loadHolidayOptions = async()=> setHolidayOptions(await fetchManageHolidays())
-  const loadPublicHolidays = async()=> {
-    const data = await robustGet<any[]>(`${BACKEND_URL}/public-holiday`)
-    setPublicHolidays(data.map(h=>({
-      id:String(h.id),
-      serviceProviderID:h.serviceProviderID,
-      companyID:h.companyID,
-      branchesID:h.branchesID,
-      manageHolidayID:h.manageHolidayID,
-      serviceProvider:h.serviceProvider?.companyName||"",
-      companyName:h.company?.companyName||"",
-      branchName:h.branches?.branchName||"",
-      holidayName:h.manageHoliday?.holidayName||"",
-      financialYear:h.financialYear,
-      startDate:h.startDate?new Date(h.startDate).toISOString().split("T")[0]:"",
-      endDate:h.endDate?new Date(h.endDate).toISOString().split("T")[0]:"",
-      createdAt:h.createdAt?new Date(h.createdAt).toISOString().split("T")[0]:new Date().toISOString().split("T")[0],
-    })))
+  
+  const loadPublicHolidays = async () => {
+    const holidays = await robustGet<any[]>(`${BACKEND_URL}/public-holiday`)
+
+    // Transform all holidays first
+    const mapped = holidays.map((h) => ({
+      id: String(h.id),
+      serviceProviderID: h.serviceProviderID,
+      companyID: h.companyID,
+      branchesID: h.branchesID,
+      manageHolidayID: h.manageHolidayID,
+      serviceProvider: h.serviceProvider?.companyName || "",
+      companyName: h.company?.companyName || "",
+      branchName: h.branches?.branchName || "",
+      holidayName: h.manageHoliday?.holidayName || "",
+      financialYear: h.financialYear,
+      startDate: h.startDate
+        ? new Date(h.startDate).toISOString().split("T")[0]
+        : "",
+      endDate: h.endDate
+        ? new Date(h.endDate).toISOString().split("T")[0]
+        : "",
+      createdAt: h.createdAt
+        ? new Date(h.createdAt).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
+    }))
+
+    // ---- Role-based filtering ----
+    if (user?.role === "SUPERADMIN") {
+      setPublicHolidays(mapped)
+      return
+    }
+
+    if (user?.role === "MANAGER") {
+      // Fetch user info from /users to confirm company/branch IDs
+      try {
+        const usersData = await robustGet<any[]>(`${BACKEND_URL}/users`)
+        const currentUser = usersData.find((u) => u.username === user.username)
+        if (currentUser) {
+          const filtered = mapped.filter(
+            (h) =>
+              h.companyID === currentUser.companyID &&
+              h.branchesID === currentUser.branchesID
+          )
+          setPublicHolidays(filtered)
+          return
+        }
+      } catch (e) {
+        console.error("Error fetching /users data for MANAGER", e)
+      }
+    }
+
+    // If not SUPERADMIN or MANAGER → check /manage-emp/credentials/all
+    try {
+      const creds = await robustGet<any[]>(`${BACKEND_URL}/manage-emp/credentials/all`)
+      const emp = user ? creds.find((c) => c.username === user.username) : null
+      if (emp) {
+        const filtered = mapped.filter(
+          (h) =>
+            h.companyID === emp.companyID && h.branchesID === emp.branchesID
+        )
+        setPublicHolidays(filtered)
+      } else {
+        // fallback: show nothing if not found
+        setPublicHolidays([])
+      }
+    } catch (err) {
+      console.error("Error fetching /manage-emp/credentials/all", err)
+      setPublicHolidays([])
+    }
   }
 
   const handleCompanySelect = async(selected:SelectedItem)=>{
@@ -165,35 +226,94 @@ export function PublicHolidayManagement() {
   }
 
   const handleSubmit = async(e:React.FormEvent)=>{
-    e.preventDefault()
-    const data = {
-      serviceProviderID: formData.serviceProviderID,
-      companyID: formData.companyID,
-      branchesID: formData.branchesID,
-      manageHolidayID: formData.manageHolidayID,
-      financialYear: formData.financialYear,
-      startDate: formData.startDate?new Date(formData.startDate):null,
-      endDate: formData.endDate?new Date(formData.endDate):null,
+  e.preventDefault()
+  const data = {
+    serviceProviderID: formData.serviceProviderID,
+    companyID: formData.companyID,
+    branchesID: formData.branchesID,
+    manageHolidayID: formData.manageHolidayID,
+    financialYear: formData.financialYear,
+    startDate: formData.startDate?new Date(formData.startDate):null,
+    endDate: formData.endDate?new Date(formData.endDate):null,
+  }
+  
+  console.log('Sending data:', data) // Add this line
+  
+  const url = editingHoliday?`${BACKEND_URL}/public-holiday/${editingHoliday.id}`:`${BACKEND_URL}/public-holiday`
+  const method = editingHoliday?"PATCH":"POST"
+  
+  try {
+    const response = await fetch(url,{
+      method,
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(data)
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Server error:', errorText)
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
-    const url = editingHoliday?`${BACKEND_URL}/public-holiday/${editingHoliday.id}`:`${BACKEND_URL}/public-holiday`
-    const method = editingHoliday?"PATCH":"POST"
-    await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
+    
     await loadPublicHolidays()
     resetForm(); setIsDialogOpen(false)
+  } catch (error) {
+    console.error('Error submitting form:', error)
+    alert('Error saving holiday. Check console for details.')
+  }
+}
+
+  const resetForm=()=>{ 
+    setFormData({
+      serviceProvider:"",companyName:"",branchName:"",holidayName:"",financialYear:"",
+      startDate:"",endDate:"",serviceProviderID:undefined,companyID:undefined,branchesID:undefined,manageHolidayID:undefined
+    }); 
+    setEditingHoliday(null)
+    setFinancialYearOptions([])
   }
 
-  const resetForm=()=>{ setFormData({
-    serviceProvider:"",companyName:"",branchName:"",holidayName:"",financialYear:"",
-    startDate:"",endDate:"",serviceProviderID:undefined,companyID:undefined,branchesID:undefined,manageHolidayID:undefined
-  }); setEditingHoliday(null)}
+ const handleEdit = async (h: PublicHoliday) => {
+  // Make sure all IDs are properly set
+  setFormData({
+    serviceProvider: h.serviceProvider || "",
+    companyName: h.companyName || "",
+    branchName: h.branchName || "",
+    holidayName: h.holidayName,
+    financialYear: h.financialYear,
+    startDate: h.startDate,
+    endDate: h.endDate,
+    serviceProviderID: h.serviceProviderID || undefined,
+    companyID: h.companyID || undefined,
+    branchesID: h.branchesID || undefined,
+    manageHolidayID: h.manageHolidayID || undefined
+  })
+    
+    setEditingHoliday(h)
+    
+    // Load financial year options if company exists
+    if (h.companyID) {
+      try {
+        const company = await robustGet<any>(`${BACKEND_URL}/company/${h.companyID}`)
+        const fyStart = company?.financialYearStart || "1st April"
+        const cycles = await robustGet<any[]>(`${BACKEND_URL}/salary-cycle/company/${h.companyID}`)
+        let day = "1"
+        if (Array.isArray(cycles) && cycles.length > 0) day = cycles[0].monthStartDay || "1"
+        setFinancialYearOptions(buildFinancialYearOptions(fyStart, day))
+      } catch (e) {
+        console.error("Error loading company data for edit", e)
+        setFinancialYearOptions([])
+      }
+    }
+    
+    setIsDialogOpen(true)
+  }
 
-  const handleEdit=(h:PublicHoliday)=>{ setFormData({
-    serviceProvider:h.serviceProvider||"",companyName:h.companyName||"",branchName:h.branchName||"",
-    holidayName:h.holidayName,financialYear:h.financialYear,startDate:h.startDate,endDate:h.endDate,
-    serviceProviderID:h.serviceProviderID,companyID:h.companyID,branchesID:h.branchesID,manageHolidayID:h.manageHolidayID
-  }); setEditingHoliday(h); if(h.companyID) handleCompanySelect({display:h.companyName||"",value:h.companyID,item:{}}); setIsDialogOpen(true)}
-
-  const handleDelete=async(id:string)=>{ await fetch(`${BACKEND_URL}/public-holiday/${id}`,{method:"DELETE"}); await loadPublicHolidays() }
+  const handleDelete = async (id: string) => { 
+    if (confirm("Are you sure you want to delete this holiday?")) {
+      await fetch(`${BACKEND_URL}/public-holiday/${id}`, { method: "DELETE" })
+      await loadPublicHolidays() 
+    }
+  }
 
   const filtered = publicHolidays.filter(h=>
     (h.companyName||"").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,31 +327,80 @@ export function PublicHolidayManagement() {
       <div className="flex items-center justify-between w-full">
         <h1 className="text-2xl font-bold">Public Holiday</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild><Button onClick={resetForm} className="bg-blue-600">Add Public Holiday</Button></DialogTrigger>
+          {canManage && (
+            <DialogTrigger asChild>
+              <Button onClick={resetForm} className="bg-blue-600">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Public Holiday
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader><DialogTitle>{editingHoliday?"Edit":"Add New"} Public Holiday</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>{editingHoliday?"Edit":"Add New"} Public Holiday</DialogTitle>
+              <DialogDescription>
+                {editingHoliday ? "Update the public holiday details" : "Add a new public holiday to the system"}
+              </DialogDescription>
+            </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-3 gap-4">
-                <SearchSuggestInput label="Service Provider" placeholder="Select Service Provider" value={formData.serviceProvider} onChange={v=>setFormData(p=>({...p,serviceProvider:v}))} onSelect={s=>setFormData(p=>({...p,serviceProvider:s.display,serviceProviderID:s.value}))} fetchData={fetchServiceProviders} displayField="companyName" valueField="id" required/>
-                <SearchSuggestInput label="Company Name" placeholder="Select Company" value={formData.companyName} onChange={v=>setFormData(p=>({...p,companyName:v}))} onSelect={handleCompanySelect} fetchData={fetchCompanies} displayField="companyName" valueField="id" required/>
-                <SearchSuggestInput label="Branch Name" placeholder="Select Branch" value={formData.branchName} onChange={v=>setFormData(p=>({...p,branchName:v}))} onSelect={s=>setFormData(p=>({...p,branchName:s.display,branchesID:s.value}))} fetchData={fetchBranches} displayField="branchName" valueField="id" required/>
+                <SearchSuggestInput 
+                  label="Service Provider" 
+                  placeholder="Select Service Provider" 
+                  value={formData.serviceProvider} 
+                  onChange={v=>setFormData(p=>({...p,serviceProvider:v}))} 
+                  onSelect={s=>setFormData(p=>({...p,serviceProvider:s.display,serviceProviderID:s.value}))} 
+                  fetchData={fetchServiceProviders} 
+                  displayField="companyName" 
+                  valueField="id" 
+                />
+                <SearchSuggestInput 
+                  label="Company Name" 
+                  placeholder="Select Company" 
+                  value={formData.companyName} 
+                  onChange={v=>setFormData(p=>({...p,companyName:v}))} 
+                  onSelect={handleCompanySelect} 
+                  fetchData={fetchCompanies} 
+                  displayField="companyName" 
+                  valueField="id" 
+                />
+                <SearchSuggestInput 
+                  label="Branch Name" 
+                  placeholder="Select Branch" 
+                  value={formData.branchName} 
+                  onChange={v=>setFormData(p=>({...p,branchName:v}))} 
+                  onSelect={s=>setFormData(p=>({...p,branchName:s.display,branchesID:s.value}))} 
+                  fetchData={fetchBranches} 
+                  displayField="branchName" 
+                  valueField="id" 
+                />
               </div>
 
               {/* Holiday Config */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Holiday Name *</Label>
-                  <select value={formData.holidayName} onChange={e=>{
-                    const sel=holidayOptions.find(h=>h.holidayName===e.target.value)
-                    setFormData(p=>({...p,holidayName:e.target.value,manageHolidayID:sel?.id}))
-                  }} required className="w-full border px-2 py-1">
+                  <select 
+                    value={formData.holidayName} 
+                    onChange={e=>{
+                      const sel = holidayOptions.find(h=>h.holidayName===e.target.value)
+                      setFormData(p=>({...p,holidayName:e.target.value,manageHolidayID:sel?.id}))
+                    }} 
+                    required 
+                    className="w-full border px-2 py-1 rounded-md"
+                  >
                     <option value="">Select Holiday</option>
                     {holidayOptions.map(h=><option key={h.id} value={h.holidayName}>{h.holidayName}</option>)}
                   </select>
                 </div>
                 <div>
                   <Label>Financial Year *</Label>
-                  <select value={formData.financialYear} onChange={e=>setFormData(p=>({...p,financialYear:e.target.value}))} required className="w-full border px-2 py-1" disabled={financialYearOptions.length===0}>
+                  <select 
+                    value={formData.financialYear} 
+                    onChange={e=>setFormData(p=>({...p,financialYear:e.target.value}))} 
+                    required 
+                    className="w-full border px-2 py-1 rounded-md"
+                  >
                     <option value="">{financialYearOptions.length?"Select Year":"Select Company first"}</option>
                     {financialYearOptions.map(opt=><option key={opt} value={opt}>{opt}</option>)}
                   </select>
@@ -240,11 +409,38 @@ export function PublicHolidayManagement() {
 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Start Date *</Label><Input type="date" value={formData.startDate} onChange={e=>setFormData(p=>({...p,startDate:e.target.value}))} required/></div>
-                <div><Label>End Date *</Label><Input type="date" value={formData.endDate} onChange={e=>setFormData(p=>({...p,endDate:e.target.value}))} required/></div>
+                <div>
+                  <Label>Start Date *</Label>
+                  <Input 
+                    type="date" 
+                    value={formData.startDate} 
+                    onChange={e=>setFormData(p=>({...p,startDate:e.target.value}))} 
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>End Date *</Label>
+                  <Input 
+                    type="date" 
+                    value={formData.endDate} 
+                    onChange={e=>setFormData(p=>({...p,endDate:e.target.value}))} 
+                    required
+                  />
+                </div>
               </div>
 
-              <DialogFooter><Button type="submit" className="bg-blue-600">{editingHoliday?"Update":"Add"} Public Holiday</Button></DialogFooter>
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => { resetForm(); setIsDialogOpen(false); }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-blue-600">
+                  {editingHoliday?"Update":"Add"} Public Holiday
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -252,27 +448,78 @@ export function PublicHolidayManagement() {
 
       {/* Search and Table */}
       <Card>
+        <CardHeader>
+          <CardTitle>Public Holidays</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="flex items-center mb-4">
-            <Search className="w-4 h-4 mr-2 text-gray-400" />
-            <Input placeholder="Search holidays..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
-            <Badge variant="secondary" className="ml-3">{filtered.length} holidays</Badge>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search holidays..." 
+                value={searchTerm} 
+                onChange={e=>setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Badge variant="secondary" className="ml-3">
+              {filtered.length} {filtered.length === 1 ? 'holiday' : 'holidays'}
+            </Badge>
           </div>
-          <Table>
-            <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Holiday</TableHead><TableHead>Year</TableHead><TableHead>Start</TableHead><TableHead>End</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-            <TableBody>{filtered.map(h=>
-              <TableRow key={h.id}>
-                <TableCell>{h.companyName}</TableCell>
-                <TableCell>{h.holidayName}</TableCell>
-                <TableCell>{h.financialYear}</TableCell>
-                <TableCell>{h.startDate}</TableCell>
-                <TableCell>{h.endDate}</TableCell>
-                <TableCell>
-                  <Button size="sm" variant="ghost" onClick={()=>handleEdit(h)}><Edit className="w-4 h-4"/></Button>
-                  <Button size="sm" variant="ghost" onClick={()=>handleDelete(h.id)} className="text-red-600"><Trash2 className="w-4 h-4"/></Button>
-                </TableCell>
-              </TableRow>)}</TableBody>
-          </Table>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Holiday</TableHead>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  {canManage && <TableHead>Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length > 0 ? (
+                  filtered.map(h => (
+                    <TableRow key={h.id}>
+                      <TableCell className="font-medium">{h.companyName || "N/A"}</TableCell>
+                      <TableCell>{h.holidayName}</TableCell>
+                      <TableCell>{h.financialYear}</TableCell>
+                    <TableCell>{new Date(h.startDate).toLocaleDateString('en-GB')}</TableCell>
+<TableCell>{new Date(h.endDate).toLocaleDateString('en-GB')}</TableCell>
+                      <TableCell>
+                        {canManage && (
+                          <div className="flex space-x-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handleEdit(h)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDelete(h.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={canManage ? 6 : 5} className="text-center py-8 text-muted-foreground">
+                      No holidays found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

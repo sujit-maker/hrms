@@ -25,6 +25,7 @@ import {
 import { Badge } from "../components/ui/badge"
 import { Icon } from "@iconify/react"
 import { Plus, Search, Edit, Trash2, Check, X } from "lucide-react"
+import { useCurrentUser } from "../hooks/useCurrentUser"
 import { SearchSuggestInput } from "../components/SearchSuggestInput"
 
 interface LeaveApplication {
@@ -45,7 +46,7 @@ interface LeaveApplication {
   fromDate: string
   toDate: string
   purpose?: string
-  status?: "Pending" | "Approved" | "Rejected"
+  status?: "Pending" | "Approved" | "Rejected" | "RevokePending" | "Revoked"
   createdAt: string
 }
 
@@ -86,6 +87,43 @@ export function LeaveApplicationsManagement() {
   })
 
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
+
+  const user = useCurrentUser()
+const canManage = user?.role === "SUPERADMIN" || user?.role === "MANAGER"
+// Revoke Modal State
+const [isRevokeDialogOpen, setIsRevokeDialogOpen] = useState(false)
+const [revokeReason, setRevokeReason] = useState("")
+const [revokeApplication, setRevokeApplication] = useState<LeaveApplication | null>(null)
+
+// === REVOKE HANDLERS ===
+const openRevokeModal = (application: LeaveApplication) => {
+  setRevokeApplication(application)
+  setRevokeReason("")
+  setIsRevokeDialogOpen(true)
+}
+
+const handleRevokeSubmit = async () => {
+  if (!revokeApplication) return
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/leave-application/revoke/${revokeApplication.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revokedReason: revokeReason }),
+    })
+
+    if (!res.ok) throw new Error(`Failed to revoke leave application: ${res.status}`)
+
+    await loadLeaveApplications()
+    setIsRevokeDialogOpen(false)
+    alert("Revoke request submitted for approval.")
+  } catch (error) {
+    console.error("Error revoking leave application:", error)
+    alert("Error submitting revoke request. Please try again.")
+  }
+}
+
+
 
   // API functions for search and suggest
   const fetchServiceProviders = async (query: string) => {
@@ -159,52 +197,80 @@ export function LeaveApplicationsManagement() {
     }
   }
 
-  // Load leave applications on component mount
-  useEffect(() => {
-    loadLeaveApplications()
-  }, [])
 
-  const loadLeaveApplications = async () => {
-    try {
-      const res = await fetch(`${BACKEND_URL}/leave-application`, {
-        cache: "no-store",
-      })
-      const data = await res.json()
-      const leaveApplicationsData = (Array.isArray(data) ? data : []).map(
-        (application: any) => ({
-          id: application.id.toString(),
-          serviceProviderID: application.serviceProviderID,
-          companyID: application.companyID,
-          branchesID: application.branchesID,
-          manageEmployeeID: application.manageEmployeeID,
-          serviceProvider: application.serviceProvider?.companyName || "",
-          companyName: application.company?.companyName || "",
-          branchName: application.branches?.branchName || "",
-          employeeId: application.manageEmployee?.employeeID || "",
-          employeeName: application.manageEmployee ? 
-            `${application.manageEmployee.employeeFirstName || ""} ${application.manageEmployee.employeeLastName || ""}`.trim() : "",
-          remainingSickLeave: application.remainingSickLeave,
-          remainingCasualLeave: application.remainingCasualLeave,
-          remainingEarnedLeave: application.remainingEarnedLeave,
-          appliedLeaveType: application.appliedLeaveType,
-          fromDate: application.fromDate
-            ? new Date(application.fromDate).toISOString().split("T")[0]
-            : "",
-          toDate: application.toDate
-            ? new Date(application.toDate).toISOString().split("T")[0]
-            : "",
-          purpose: application.purpose,
-          status: (application.status || "Pending") as "Pending" | "Approved" | "Rejected",
-          createdAt: application.createdAt
-            ? new Date(application.createdAt).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
-        })
-      )
-      setLeaveApplications(leaveApplicationsData)
-    } catch (error) {
-      console.error("Error loading leave applications:", error)
+const loadLeaveApplications = async () => {
+  try {
+    const res = await fetch(`${BACKEND_URL}/leave-application`, { cache: "no-store" })
+    const data = await res.json()
+    const mapped = (Array.isArray(data) ? data : []).map((application: any) => ({
+      id: application.id.toString(),
+      serviceProviderID: application.serviceProviderID,
+      companyID: application.companyID,
+      branchesID: application.branchesID,
+      manageEmployeeID: application.manageEmployeeID,
+      serviceProvider: application.serviceProvider?.companyName || "",
+      companyName: application.company?.companyName || "",
+      branchName: application.branches?.branchName || "",
+      employeeId: application.manageEmployee?.employeeID || "",
+      employeeName: application.manageEmployee
+        ? `${application.manageEmployee.employeeFirstName || ""} ${application.manageEmployee.employeeLastName || ""}`.trim()
+        : "",
+      remainingSickLeave: application.remainingSickLeave,
+      remainingCasualLeave: application.remainingCasualLeave,
+      remainingEarnedLeave: application.remainingEarnedLeave,
+      appliedLeaveType: application.appliedLeaveType,
+      fromDate: application.fromDate ? new Date(application.fromDate).toISOString().split("T")[0] : "",
+      toDate: application.toDate ? new Date(application.toDate).toISOString().split("T")[0] : "",
+      purpose: application.purpose,
+      status: (application.status || "Pending") as "Pending" | "Approved" | "Rejected",
+      createdAt: application.createdAt ? new Date(application.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    }))
+
+    // Role-based filtering
+    if (!user) {
+      setLeaveApplications([])
+      return
     }
+
+    if (user.role === "SUPERADMIN") {
+      setLeaveApplications(mapped)
+      return
+    }
+
+    if (user.role === "MANAGER") {
+      // Fetch manager info from /users
+      const usersData = await fetch(`${BACKEND_URL}/users`).then((r) => r.json())
+      const currentUser = usersData.find((u: any) => u.username === user.username)
+      if (currentUser) {
+        const filtered = mapped.filter(
+          (a) =>
+            a.companyID === currentUser.companyID &&
+            a.branchesID === currentUser.branchesID
+        )
+        setLeaveApplications(filtered)
+        return
+      }
+    }
+
+    // For employees or others → get from /manage-emp/credentials/all
+    const creds = await fetch(`${BACKEND_URL}/manage-emp/credentials/all`).then((r) => r.json())
+    const emp = creds.find((c: any) => c.username === user.username)
+    if (emp) {
+      const filtered = mapped.filter(
+        (a) => a.companyID === emp.companyID && a.branchesID === emp.branchesID
+      )
+      setLeaveApplications(filtered)
+    } else {
+      setLeaveApplications([])
+    }
+  } catch (error) {
+    console.error("Error loading leave applications:", error)
   }
+}
+
+useEffect(() => {
+  if (user) loadLeaveApplications()
+}, [user])
 
   const filteredApplications = leaveApplications.filter(application =>
     (application.serviceProvider || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -387,6 +453,8 @@ export function LeaveApplicationsManagement() {
       console.error("Error rejecting leave application:", error)
     }
   }
+
+  
 
   return (
     <div className="space-y-6 w-full max-w-full mx-auto px-4 overflow-hidden">
@@ -590,6 +658,45 @@ export function LeaveApplicationsManagement() {
             </DialogContent>
           </Dialog>
         </div>
+        {/* === Revoke Leave Modal === */}
+<Dialog open={isRevokeDialogOpen} onOpenChange={setIsRevokeDialogOpen}>
+  <DialogContent className="sm:max-w-[500px]">
+    <DialogHeader>
+      <DialogTitle>Revoke Leave Application</DialogTitle>
+      <DialogDescription>
+        Please provide a reason for revoking this leave. It will go for manager approval.
+      </DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4 mt-4">
+      <div>
+        <Label htmlFor="revokedReason">Revoked Reason</Label>
+        <Input
+          id="revokedReason"
+          type="text"
+          placeholder="Enter reason for revoking leave"
+          value={revokeReason}
+          onChange={(e) => setRevokeReason(e.target.value)}
+          required
+        />
+      </div>
+      <div>
+        <Label>Request Date</Label>
+        <div className="border rounded-md px-3 py-2 bg-gray-50 text-gray-700">
+          {new Date().toLocaleString()}
+        </div>
+      </div>
+    </div>
+    <DialogFooter className="mt-4">
+      <Button variant="outline" onClick={() => setIsRevokeDialogOpen(false)}>
+        Cancel
+      </Button>
+      <Button onClick={handleRevokeSubmit} className="bg-yellow-600 hover:bg-yellow-700 text-white">
+        Submit Revoke Request
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
       </div>
 
       {/* Search and Filters */}
@@ -625,11 +732,7 @@ export function LeaveApplicationsManagement() {
             <Table className="w-full table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[50px]">#</TableHead>
-                  <TableHead className="w-[90px]">Service Provider</TableHead>
-                  <TableHead className="w-[80px]">Company Name</TableHead>
-                  <TableHead className="w-[80px]">Branch Name</TableHead>
-                  <TableHead className="w-[70px]">Employee ID</TableHead>
+                
                   <TableHead className="w-[100px]">Employee Name</TableHead>
                   <TableHead className="w-[70px]">Leave Type</TableHead>
                   <TableHead className="w-[70px]">From Date</TableHead>
@@ -637,7 +740,7 @@ export function LeaveApplicationsManagement() {
                   <TableHead className="w-[60px]">No of Days</TableHead>
                   <TableHead className="w-[80px]">Purpose</TableHead>
                   <TableHead className="w-[70px]">Status</TableHead>
-                  <TableHead className="w-[80px] text-right">Action</TableHead>
+     <TableHead className="w-[80px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -654,11 +757,7 @@ export function LeaveApplicationsManagement() {
                 ) : (
                   filteredApplications.map((application, index) => (
                     <TableRow key={application.id}>
-                      <TableCell className="font-medium truncate">{index + 1}</TableCell>
-                      <TableCell className="truncate" title={application.serviceProvider}>{application.serviceProvider}</TableCell>
-                      <TableCell className="truncate" title={application.companyName}>{application.companyName}</TableCell>
-                      <TableCell className="truncate" title={application.branchName}>{application.branchName}</TableCell>
-                      <TableCell className="truncate">{application.employeeId}</TableCell>
+                      
                       <TableCell className="truncate" title={application.employeeName}>{application.employeeName}</TableCell>
                       <TableCell className="truncate">{application.appliedLeaveType}</TableCell>
                       <TableCell className="truncate">{application.fromDate}</TableCell>
@@ -666,57 +765,118 @@ export function LeaveApplicationsManagement() {
                       <TableCell className="truncate text-center">{calculateDays(application.fromDate, application.toDate)}</TableCell>
                       <TableCell className="truncate" title={application.purpose}>{application.purpose}</TableCell>
                       <TableCell className="whitespace-nowrap">
-                        <Badge variant={
-                          application.status === "Approved" ? "default" : 
-                          application.status === "Rejected" ? "destructive" : "secondary"
-                        }>
-                          {application.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1">
-                          {application.status === "Pending" && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleApprove(application.id)}
-                                className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                title="Approve"
-                              >
-                                <Check className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleReject(application.id)}
-                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Reject"
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(application)}
-                            className="h-7 w-7 p-0"
-                            title="Edit"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(application.id)}
-                            className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
+  <Badge
+  variant={
+    application.status === "Approved"
+      ? "default"
+      : application.status === "Rejected"
+      ? "destructive"
+      : application.status === "RevokePending"
+      ? "outline"
+      : application.status === "Revoked"
+      ? "secondary"
+      : "secondary"
+  }
+>
+  {application.status === "RevokePending" ? "Revoke Pending" : application.status}
+</Badge>
+
+</TableCell>
+
+{/* === Action Buttons Section === */}
+<TableCell className="text-right whitespace-nowrap">
+  <div className="flex items-center justify-end gap-1">
+
+    {/* --- For SUPERADMIN and MANAGER --- */}
+    {canManage ? (
+      <>
+        {/* Pending or RevokePending approval flow */}
+        {(application.status === "Pending" || application.status === "RevokePending") && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleApprove(application.id)}
+              className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+              title="Approve"
+            >
+              <Check className="w-3 h-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleReject(application.id)}
+              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+              title="Reject"
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          </>
+        )}
+
+        {/* Edit/Delete always available for managers */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleEdit(application)}
+          className="h-7 w-7 p-0"
+          title="Edit"
+        >
+          <Edit className="w-3 h-3" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleDelete(application.id)}
+          className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+          title="Delete"
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      </>
+    ) : (
+      <>
+        {/* Normal Employee actions */}
+        {application.status === "Pending" && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEdit(application)}
+              className="h-7 w-7 p-0"
+              title="Edit"
+            >
+              <Edit className="w-3 h-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(application.id)}
+              className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+              title="Delete"
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </>
+        )}
+
+        {/* Revoke option for approved leaves */}
+        {application.status === "Approved" && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => openRevokeModal(application)}
+            className="h-7 w-7 p-0 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+            title="Request Revoke"
+          >
+            <Icon icon="mdi:rotate-left" className="w-3 h-3" />
+          </Button>
+        )}
+      </>
+    )}
+  </div>
+</TableCell>
+
                     </TableRow>
                   ))
                 )}

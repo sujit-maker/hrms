@@ -24,7 +24,15 @@ export class ReimbursementService {
 
     // Create parent reimbursement record
     const created = await this.prisma.reimbursement.create({
-      data: parent,
+      data: {
+        ...parent,
+        // Ensure payment fields are included
+        paymentMode: parent.paymentMode ?? null,
+        paymentType: parent.paymentType ?? null,
+        paymentDate: parent.paymentDate ?? null,
+        paymentRemark: parent.paymentRemark ?? null,
+        paymentProof: parent.paymentProof ?? null,
+      },
       include: this.includeRels(),
     });
 
@@ -45,7 +53,16 @@ export class ReimbursementService {
 
   /** Bulk create multiple parent reimbursements */
   async createMany(dtos: CreateReimbursementDto[]) {
-    return this.prisma.reimbursement.createMany({ data: dtos });
+    return this.prisma.reimbursement.createMany({ 
+      data: dtos.map(dto => ({
+        ...dto,
+        paymentMode: dto.paymentMode ?? null,
+        paymentType: dto.paymentType ?? null,
+        paymentDate: dto.paymentDate ?? null,
+        paymentRemark: dto.paymentRemark ?? null,
+        paymentProof: dto.paymentProof ?? null,
+      }))
+    });
   }
 
   /** ─────────────── READ ─────────────── */
@@ -69,7 +86,7 @@ export class ReimbursementService {
     return this.prisma.reimbursement.findMany({
       where: { manageEmployeeID: empId },
       include: this.includeRels(),
-      orderBy: { id: 'desc' }, // Changed from date to id
+      orderBy: { id: 'desc' },
     });
   }
 
@@ -77,7 +94,25 @@ export class ReimbursementService {
     return this.prisma.reimbursement.findMany({
       where: { companyID },
       include: this.includeRels(),
-      orderBy: { id: 'desc' }, // Changed from date to id
+      orderBy: { id: 'desc' },
+    });
+  }
+
+  // NEW: Find reimbursements by status
+  async findByStatus(status: string) {
+    return this.prisma.reimbursement.findMany({
+      where: { status },
+      include: this.includeRels(),
+      orderBy: { id: 'desc' },
+    });
+  }
+
+  // NEW: Find reimbursements by approval type
+  async findByApprovalType(approvalType: string) {
+    return this.prisma.reimbursement.findMany({
+      where: { approvalType },
+      include: this.includeRels(),
+      orderBy: { id: 'desc' },
     });
   }
 
@@ -89,10 +124,18 @@ export class ReimbursementService {
 
     // Transaction ensures parent & items stay consistent
     await this.prisma.$transaction(async (tx) => {
-      // Update parent reimbursement
+      // Update parent reimbursement with payment fields
       await tx.reimbursement.update({
         where: { id },
-        data: parent,
+        data: {
+          ...parent,
+          // Ensure payment fields are included in update
+          paymentMode: parent.paymentMode ?? null,
+          paymentType: parent.paymentType ?? null,
+          paymentDate: parent.paymentDate ?? null,
+          paymentRemark: parent.paymentRemark ?? null,
+          paymentProof: parent.paymentProof ?? null,
+        },
       });
 
       // If items array provided, replace all existing line items
@@ -112,6 +155,47 @@ export class ReimbursementService {
     });
 
     return this.findOne(id);
+  }
+
+  // NEW: Update payment details specifically
+  async updatePayment(id: number, paymentData: {
+    paymentMode?: string;
+    paymentType?: string;
+    paymentDate?: string;
+    paymentRemark?: string;
+    paymentProof?: string;
+    status?: string;
+  }) {
+    await this.ensureExists(id);
+
+    return this.prisma.reimbursement.update({
+      where: { id },
+      data: {
+        ...paymentData,
+        status: paymentData.status ?? 'Paid', // Default to 'Paid' when updating payment
+      },
+      include: this.includeRels(),
+    });
+  }
+
+  // NEW: Update approval details specifically
+  async updateApproval(id: number, approvalData: {
+    approvalType?: string;
+    salaryPeriod?: string;
+    voucherCode?: string;
+    voucherDate?: string;
+    status?: string;
+  }) {
+    await this.ensureExists(id);
+
+    return this.prisma.reimbursement.update({
+      where: { id },
+      data: {
+        ...approvalData,
+        status: approvalData.status ?? 'Approved', // Default to 'Approved' when updating approval
+      },
+      include: this.includeRels(),
+    });
   }
 
   /** ─────────────── DELETE ─────────────── */

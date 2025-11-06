@@ -31,6 +31,15 @@ export class LeaveApplicationController {
     return this.leaveApplicationService.findOne(id);
   }
 
+  @Patch('revoke/:id')
+  async revokeLeave(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { revokedReason?: string },
+  ) {
+    return this.leaveApplicationService.revokeLeave(id, body.revokedReason);
+  }
+
+
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,

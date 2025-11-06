@@ -7,24 +7,102 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ManageEmployeeService } from './manage-employee.service';
-import { CreateManageEmployeeDto } from './dto/create-manage-employee.dto';
+import { CreateManageEmployeeDto, EmployeeCredentialsUpdateDto, EmployeeLoginDto } from './dto/create-manage-employee.dto';
 import { UpdateManageEmployeeDto } from './dto/update-manage-employee.dto';
 
 @Controller('manage-emp')
 export class ManageEmployeeController {
   constructor(private readonly service: ManageEmployeeService) {}
 
+
+
   @Post()
   create(@Body() dto: CreateManageEmployeeDto) {
     return this.service.create(dto);
   }
 
+  @Get('credentials/all')
+async getAllCredentials() {
+  const data = await this.service.getAllCredentials();
+  return data;
+}
+
+
+
+
+   // 1. Get credentials by employee ID
+  @Get(':id/credentials')
+  getEmployeeCredentials(@Param('id') id: string) {
+    return this.service.getEmployeeCredentials(+id);
+  }
+
+  // 2. Get credentials by username
+  @Get('credentials/:username')
+  getCredentialsByUsername(@Param('username') username: string) {
+    return this.service.getCredentialsByUsername(username);
+  }
+
+  // 3. Update employee credentials
+  @Patch(':id/credentials')
+  updateCredentials(
+    @Param('id') id: string,
+    @Body() updateCredentialDto: EmployeeCredentialsUpdateDto,
+  ) {
+    return this.service.updateCredentials(+id, updateCredentialDto);
+  }
+
+
+
+
+
+  // Add this to your controller
+@Get('credentials/search')
+searchCredentials(
+  @Query('username') username?: string,
+  @Query('isActive') isActive?: string,
+  @Query('serviceProviderID') serviceProviderID?: string,
+  @Query('companyID') companyID?: string,
+  @Query('branchesID') branchesID?: string,
+) {
+  return this.service.searchCredentials({
+    ...(username && { username }),
+    ...(isActive !== undefined && { isActive: isActive === 'true' }),
+    ...(serviceProviderID && { serviceProviderID: +serviceProviderID }),
+    ...(companyID && { companyID: +companyID }),
+    ...(branchesID && { branchesID: +branchesID }),
+  });
+}
+
+  // 4. Employee login endpoint
+  @Post('login')
+  employeeLogin(@Body() loginDto: EmployeeLoginDto) {
+    return this.service.verifyEmployeeLogin(loginDto.username, loginDto.password);
+  }
+
+  // 5. Reset password for employee
+  @Post(':id/reset-password')
+  resetPassword(@Param('id') id: string) {
+    return this.service.resetPassword(+id);
+  }
+
+  // 6. Activate/Deactivate credentials
+  @Patch(':id/credentials/status')
+  updateCredentialStatus(
+    @Param('id') id: string,
+    @Body() body: { isActive: boolean },
+  ) {
+    return this.service.updateCredentials(+id, { isActive: body.isActive });
+  }
+
+
   @Get()
   findAll() {
     return this.service.findAll();
   }
+
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {

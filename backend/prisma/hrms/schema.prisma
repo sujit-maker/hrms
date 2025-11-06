@@ -47,8 +47,7 @@ model BankDetails {
   branches        Branches         @relation(fields: [branchesID], references: [id], onDelete: Cascade, onUpdate: NoAction)
   company         Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  // Optional: prevent duplicates per branch
-  // @@unique([branchesID, accountNo])
+  
 
   @@index([branchesID])
 }
@@ -133,7 +132,9 @@ model Branches {
   salaryDeduction              SalaryDeduction[]
   workShift                    WorkShift[]
   devices                      Devices[]
-    generateSalary          GenerateSalary[]
+  generateSalary               GenerateSalary[]
+  employeeCredentials           EmployeeCredentials[]
+  user                         User[]
 
 }
 
@@ -189,6 +190,8 @@ model Company {
   devices                      Devices[]
   generateSalary          GenerateSalary[]
   reimbursement          Reimbursement[]
+  employeeCredentials     EmployeeCredentials[]
+  user                     User[]
 }
 
 model Contractors {
@@ -241,7 +244,7 @@ model Designations {
   serviceProviderID                                                     Int?
   companyID                                                             Int?
   branchesID                                                            Int?
-  desgination                                                         String?              @db.VarChar
+  designation                                                         String?              @db.VarChar
   branches                                                              Branches?            @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company                                                               Company?             @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider                                                       ServiceProvider?     @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -457,6 +460,8 @@ model leaveApplication {
   remainingSickLeave      Int?
   remainingCasualLeave    Int?
   remainingEarnedLeave    Int?
+  revokedAt       DateTime?
+  revokedReason String? 
   appliedLeaveType        String?                   @db.VarChar
   fromDate                DateTime?                 @db.Date
   toDate                  DateTime?                 @db.Date
@@ -583,6 +588,43 @@ model ManageEmployee {
   empPromotion            EmpPromotion[]
   bonusAllocation         BonusAllocation[]
   reimbursement          Reimbursement[]
+  employeeBankDetails     EmployeeBankDetails[]
+  employeeCredentials     EmployeeCredentials[]
+}
+
+
+model EmployeeCredentials {
+  id                  Int      @id @default(autoincrement())
+  employeeID          Int      @unique
+  username            String   @db.VarChar
+  password            String   @db.VarChar
+  serviceProviderID   Int?
+  companyID           Int?
+  branchesID          Int?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  employee            ManageEmployee @relation(fields: [employeeID], references: [id], onDelete: Cascade)
+  serviceProvider     ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company             Company? @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches            Branches? @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model EmployeeBankDetails {
+  id               Int              @id @default(autoincrement())
+  employeeID       Int
+  bankName         String?          @db.VarChar
+  bankBranchName   String?          @db.VarChar
+  accNumber        String?          @db.VarChar
+  ifscCode         String?          @db.VarChar
+  upi              String?          @db.VarChar
+
+  // Relation
+  employee         ManageEmployee   @relation(fields: [employeeID], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("employee_bank_details")
 }
 
 model EmpPromotion {
@@ -766,15 +808,24 @@ model  GenerateSalary{
   serviceProviderID Int?
   companyID         Int?
   branchesID        Int?
-  employeeID Int
+  employeeID  Int
   monthPeriod  String
-    markAs  String?
-  lateMarkCount  String?
+
+      // 🔽 PAYMENT FIELDS (NEWLY ADDED)
+  paymentMode       String?          // "Cash" or "Bank"
+  paymentType       String?          // "Cash", "Cheque", "UPI"
+  paymentDate       String?          // Date when payment was made
+  paymentRemark     String?          // Optional remark for payment
+  paymentProof      String?          // UTR/Cheque number for bank payments
+  status            String?
+  
   manageEmployee  ManageEmployee?  @relation(fields: [employeeID], references: [id], onDelete: NoAction, onUpdate: NoAction)
    branches          Branches?        @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   company           Company?         @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
   serviceProvider   ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
+
+
 
 model SalaryDeduction {
   id                           Int                            @id @default(autoincrement())
@@ -832,6 +883,8 @@ model ServiceProvider {
   devices                      Devices[]
   generateSalary               GenerateSalary[]
   reimbursement                 Reimbursement[]
+  employeeCredentials           EmployeeCredentials[]
+  user                  User[]
   created_at                   DateTime?                      @db.Timestamp(6)
   updated_at                   DateTime?                      @db.Timestamp(6)
 }
@@ -946,6 +999,13 @@ model Reimbursement {
   voucherCode       String?          // Only if approvalType is "Voucher"
   voucherDate       String?          // Only if approvalType is "Voucher"
 
+    // 🔽 PAYMENT FIELDS (NEWLY ADDED)
+  paymentMode       String?          // "Cash" or "Bank"
+  paymentType       String?          // "Cash", "Cheque", "UPI"
+  paymentDate       String?          // Date when payment was made
+  paymentRemark     String?          // Optional remark for payment
+  paymentProof      String?          // UTR/Cheque number for bank payments
+
   // 🔽 NEW: items linked to a single reimbursement
   items             ReimbursementItem[]
 
@@ -964,3 +1024,27 @@ model ReimbursementItem {
 
   reimbursement    Reimbursement @relation(fields: [reimbursementID], references: [id], onDelete: Cascade)
 }
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  MANAGER
+  EXECUTIVE
+}
+
+model User {
+  id             Int       @id @default(autoincrement())
+  username       String    @unique
+  passwordHash   String
+  role           UserRole  @default(EXECUTIVE)
+    serviceProviderID   Int?
+  companyID           Int?
+  branchesID          Int?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  serviceProvider     ServiceProvider? @relation(fields: [serviceProviderID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  company             Company? @relation(fields: [companyID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  branches            Branches? @relation(fields: [branchesID], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+

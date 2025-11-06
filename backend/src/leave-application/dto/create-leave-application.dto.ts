@@ -47,5 +47,13 @@ export class CreateLeaveApplicationDto {
 
   @IsOptional()
   @IsString()
+  revokedReason?: string;
+
+  @IsOptional()
+  @IsString()
+  revokedAt?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 }

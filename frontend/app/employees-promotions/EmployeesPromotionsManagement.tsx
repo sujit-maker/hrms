@@ -36,7 +36,7 @@ interface SP { id: ID; companyName?: string | null }
 interface CO { id: ID; companyName?: string | null }
 interface BR { id: ID; branchName?: string | null }
 interface Dept { id: ID; departmentName?: string | null }
-interface Desg { id: ID; desgination?: string | null }
+interface Desg { id: ID; designation?: string | null }
 
 
 // Minimal employee row for suggestions + promotions
@@ -58,7 +58,7 @@ interface EmpRow {
 
   // Optional nested names (if your API ever includes them)
   departments?: { id: ID; departmentName?: string | null } | null;
-  designations?: { id: ID; desgination?: string | null } | null;
+  designations?: { id: ID; designation?: string | null } | null;
 
   // 🔽 NEW: latest values live here with nested relations
   empPromotion?: Array<{
@@ -78,7 +78,7 @@ interface EmpRow {
     hourlyPayGradeID?: ID | null;
     // Nested relation objects
     departments?: { id: ID; departmentName?: string | null } | null;
-    designations?: { id: ID; desgination?: string | null } | null;
+    designations?: { id: ID; designation?: string | null } | null;
     workShift?: { id: ID; workShiftName?: string | null } | null;
     attendancePolicy?: { id: ID; attendancePolicyName?: string | null } | null;
     leavePolicy?: { id: ID; leavePolicyName?: string | null } | null;
@@ -110,7 +110,7 @@ interface CurrentPos {
   company?: { id: ID; companyName?: string | null } | null;
   branches?: { id: ID; branchName?: string | null } | null;
   departments?: { id: ID; departmentName?: string | null } | null;
-  designations?: { id: ID; desgination?: string | null } | null;
+  designations?: { id: ID; designation?: string | null } | null;
 }
 
 // Promotion request row (empPromotionuest)
@@ -141,9 +141,9 @@ interface empPromotion {
 
   // Optional nested names if included by your API
   departments_empPromotionuest_currentDepartmentIDTodepartments?: { id: ID; departmentName?: string | null } | null;
-  designations_empPromotionuest_currentDesignationIDTodesignations?: { id: ID; desgination?: string | null } | null;
+  designations_empPromotionuest_currentDesignationIDTodesignations?: { id: ID; designation?: string | null } | null;
   departments_empPromotionuest_proposedDepartmentIDTodepartments?: { id: ID; departmentName?: string | null } | null;
-  designations_empPromotionuest_proposedDesignationIDTodesignations?: { id: ID; desgination?: string | null } | null;
+  designations_empPromotionuest_proposedDesignationIDTodesignations?: { id: ID; designation?: string | null } | null;
 }
 
 /** ========= API endpoints ========= */
@@ -504,7 +504,7 @@ interface EmpPromotionRow {
 
   // nested names (as returned in your sample)
   departments?: { id: ID; departmentName?: string | null } | null;
-  designations?: { id: ID; desgination?: string | null } | null;
+  designations?: { id: ID; designation?: string | null } | null;
   workShift?: any | null;
   attendancePolicy?: any | null;
   leavePolicy?: any | null;
@@ -638,7 +638,7 @@ useEffect(() => { fetchRows(); }, []);
       setLoading: setDesgNewLoading, setList: setDesgNewList,
       endpoint: API.designations,
       proj: (raw) => raw as Desg[],
-      filter: (d) => (d.desgination ?? "").toLowerCase().includes(q.toLowerCase()),
+      filter: (d) => (d.designation ?? "").toLowerCase().includes(q.toLowerCase()),
     });
 
     const runFetchWorkShift = (q: string) =>
@@ -776,7 +776,7 @@ const runFetchHourlyPG = (q: string) =>
     const empName = `${r.manageEmployee?.employeeFirstName ?? ""} ${r.manageEmployee?.employeeLastName ?? ""}`.toLowerCase();
     const empId   = (r.manageEmployee?.employeeID ?? "").toLowerCase();
     const dept    = (r.departments?.departmentName ?? "").toLowerCase();
-    const desg    = (r.designations?.desgination ?? "").toLowerCase();
+    const desg    = (r.designations?.designation ?? "").toLowerCase();
     const etype   = (r.employmentType ?? "").toLowerCase();
     const estatus = (r.employmentStatus ?? "").toLowerCase();
     const ptype   = (r.salaryPayGradeType ?? "").toLowerCase();
@@ -862,7 +862,7 @@ const runFetchHourlyPG = (q: string) =>
     // Extract nested relation names directly from latest promotion
     // If no promotion data, try to get from employee record's nested relations
     let deptName = latest?.departments?.departmentName ?? (emp as any).departments?.departmentName ?? "";
-    let desgName = latest?.designations?.desgination ?? (emp as any).designations?.desgination ?? "";
+    let desgName = latest?.designations?.designation ?? (emp as any).designations?.designation ?? "";
     let workShiftName = latest?.workShift?.workShiftName ?? (emp as any).workShift?.workShiftName ?? "";
     let attendancePolicyName = latest?.attendancePolicy?.attendancePolicyName ?? (emp as any).attendancePolicy?.attendancePolicyName ?? "";
     let leavePolicyName = latest?.leavePolicy?.leavePolicyName ?? (emp as any).leavePolicy?.leavePolicyName ?? "";
@@ -883,8 +883,8 @@ const runFetchHourlyPG = (q: string) =>
 
     if (!desgName && promotionObj.designationID) {
       try {
-        const desg = await fetchJSONSafe<{ desgination?: string }>(`${API.designations}/${promotionObj.designationID}`);
-        desgName = desg?.desgination ?? "";
+        const desg = await fetchJSONSafe<{ designation?: string }>(`${API.designations}/${promotionObj.designationID}`);
+        desgName = desg?.designation ?? "";
       } catch (e) {
         console.warn("Could not fetch designation name:", e);
       }
@@ -1210,7 +1210,7 @@ const handleEdit = async (row: EmpPromotionRow) => {
     
     // Populate promoted department/designation autocompletes
     deptNewAutocomplete: row.departments?.departmentName ?? "",
-    desgNewAutocomplete: row.designations?.desgination ?? "",
+    desgNewAutocomplete: row.designations?.designation ?? "",
     
     // Populate description, promotion date, status
     description: (row as any).description ?? "",
@@ -1236,7 +1236,7 @@ const handleEdit = async (row: EmpPromotionRow) => {
     },
     // instant display names
     currentDeptNameDisplay: row.departments?.departmentName ?? p.currentDeptNameDisplay,
-    currentDesgNameDisplay: row.designations?.desgination ?? p.currentDesgNameDisplay,
+    currentDesgNameDisplay: row.designations?.designation ?? p.currentDesgNameDisplay,
   }));
 
   // Clear suggestion lists to prevent highlighting/focus
@@ -1583,7 +1583,7 @@ managerAutocomplete: "",
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Current Designation</Label>
+                    <Label>Current designation</Label>
                     <Input
                       value={formData.currentDesgNameDisplay}
                       readOnly
@@ -1747,9 +1747,9 @@ managerAutocomplete: "",
 
 
                   {/* desg new */}
-                 {/* Promoted Designation */}
+                 {/* Promoted designation */}
 <div ref={desgNewRef} className="space-y-2 relative">
-  <Label>Promoted Designation</Label>
+  <Label>Promoted designation</Label>
   <Input
     value={formData.desgNewAutocomplete}
     onChange={(e) => {
@@ -1780,14 +1780,14 @@ managerAutocomplete: "",
           onClick={() => {
             setFormData((p) => ({
               ...p,
-              desgNewAutocomplete: d.desgination ?? "",
+              desgNewAutocomplete: d.designation ?? "",
               // ⬇️ IMPORTANT: write to promotion
               promotion: { ...p.promotion, designationID: d.id },
             }));
             setDesgNewList([]);
           }}
         >
-          {d.desgination}
+          {d.designation}
         </div>
       ))}
     </div>
@@ -2324,11 +2324,11 @@ managerAutocomplete: "",
     const empName = `${r.manageEmployee?.employeeFirstName ?? ""} ${r.manageEmployee?.employeeLastName ?? ""}`.trim();
 
     const newDept = r.departments?.departmentName?.trim() ?? "—";
-    const newDesg = r.designations?.desgination?.trim() ?? "—";
+    const newDesg = r.designations?.designation?.trim() ?? "—";
 
     // Use the same data for proposed fields since they represent the promoted values
     const proposedDept = r.departments?.departmentName?.trim() ?? "—";
-    const proposedDesg = r.designations?.desgination?.trim() ?? "—";
+    const proposedDesg = r.designations?.designation?.trim() ?? "—";
 
     // /emp-promotion has no official date; try promotionDate if present, else createdAt, else —
     const promoDate =
@@ -2406,7 +2406,7 @@ managerAutocomplete: "",
                 <TableRow>
                   <TableHead className="w-[160px]">Promotion Date</TableHead>
                   <TableHead className="w-[160px]">Department</TableHead>
-                  <TableHead className="w-[160px]">Designation</TableHead>
+                  <TableHead className="w-[160px]">designation</TableHead>
                   <TableHead className="w-[120px]">Paygrade</TableHead>
                   <TableHead className="w-[140px]">Emp. Type</TableHead>
                   <TableHead className="w-[140px]">Emp. Status</TableHead>
@@ -2428,7 +2428,7 @@ managerAutocomplete: "",
                       <TableRow key={hr.id}>
                         <TableCell className="whitespace-nowrap">{promoDate}</TableCell>
                         <TableCell className="whitespace-nowrap">{hr.departments?.departmentName ?? "—"}</TableCell>
-                        <TableCell className="whitespace-nowrap">{hr.designations?.desgination ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap">{hr.designations?.designation ?? "—"}</TableCell>
                         <TableCell className="whitespace-nowrap">{hr.salaryPayGradeType ?? "—"}</TableCell>
                         <TableCell className="whitespace-nowrap">{hr.employmentType ?? "—"}</TableCell>
                         <TableCell className="whitespace-nowrap">{hr.employmentStatus ?? "—"}</TableCell>

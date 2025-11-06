@@ -40,6 +40,10 @@ import { EmpAttendanceLogsModule } from './emp-attendance-logs/emp-attendance-lo
 import { SalaryAdvanceModule } from './salary-advance/salary-advance.module';
 import { SalaryAdvanceRepaymentModule } from './salary-advance-repayment/salary-advance-repayment.module';
 import { ReimbursementModule } from './reimbursement/reimbursement.module';
+import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
 
 @Module({
   imports: [
@@ -86,6 +90,10 @@ import { ReimbursementModule } from './reimbursement/reimbursement.module';
     SalaryAdvanceModule,
     SalaryAdvanceRepaymentModule,
     ReimbursementModule,
+    UsersModule,
+    AuthModule,
   ],
+  providers: [AuthService],
+  controllers: [AuthController],
 })
 export class AppModule {}

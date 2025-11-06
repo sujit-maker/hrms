@@ -36,7 +36,7 @@ interface DesignationRead {
   serviceProviderID?: ID | null;
   companyID?: ID | null;
   branchesID?: ID | null;
-  desgination?: string | null;        // <- matches your prisma field spelling
+  designation?: string | null;        // <- matches your prisma field spelling
   createdAt?: string | null;
 
   // optional nested if API includes them
@@ -123,7 +123,7 @@ export function DesignationManagement() {
     companyID: null as ID | null,
     branchesID: null as ID | null,
 
-    desgination: "",
+    designation: "",
 
     spAutocomplete: "",
     coAutocomplete: "",
@@ -270,7 +270,7 @@ export function DesignationManagement() {
       serviceProviderID: null,
       companyID: null,
       branchesID: null,
-      desgination: "",
+      designation: "",
       spAutocomplete: "",
       coAutocomplete: "",
       brAutocomplete: "",
@@ -289,7 +289,7 @@ export function DesignationManagement() {
       companyID: r.companyID ?? r.company?.id ?? null,
       branchesID: r.branchesID ?? r.branches?.id ?? null,
 
-      desgination: r.desgination ?? "",
+      designation: r.designation ?? "",
 
       spAutocomplete: r.serviceProvider?.companyName
         ?? r.serviceProviderName
@@ -334,7 +334,7 @@ export function DesignationManagement() {
       serviceProviderID: formData.serviceProviderID ?? undefined,
       companyID: formData.companyID ?? undefined,
       branchesID: formData.branchesID ?? undefined,
-      desgination: formData.desgination || undefined,
+      designation: formData.designation || undefined,
     };
 
     try {
@@ -378,7 +378,7 @@ export function DesignationManagement() {
       r.branches?.branchName ?? r.branchName ?? (r.branchesID != null ? brMap[r.branchesID] : "");
     return rows.filter((r) =>
       [
-        r.desgination,
+        r.designation,
         spNameOf(r),
         coNameOf(r),
         brNameOf(r),
@@ -419,12 +419,12 @@ export function DesignationManagement() {
         <Dialog open={isDialogOpen} onOpenChange={(v) => { setIsDialogOpen(v); if (!v) resetForm(); }}>
           <DialogTrigger asChild>
             <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-sm px-3 py-2">
-              <Plus className="w-4 h-4 mr-1" /> Add Designation
+              <Plus className="w-4 h-4 mr-1" /> Add designation
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{editing ? "Edit Designation" : "Add New Designation"}</DialogTitle>
+              <DialogTitle>{editing ? "Edit designation" : "Add New designation"}</DialogTitle>
               <DialogDescription>
                 {editing ? "Update designation details below." : "Fill in details to add a new designation."}
               </DialogDescription>
@@ -566,12 +566,12 @@ export function DesignationManagement() {
                 )}
               </div>
 
-              {/* Designation Name */}
+              {/* designation Name */}
               <div className="space-y-2">
-                <Label>Designation *</Label>
+                <Label>designation *</Label>
                 <Input
-                  value={formData.desgination}
-                  onChange={(e) => setFormData((p) => ({ ...p, desgination: e.target.value }))}
+                  value={formData.designation}
+                  onChange={(e) => setFormData((p) => ({ ...p, designation: e.target.value }))}
                   required
                 />
               </div>
@@ -579,7 +579,7 @@ export function DesignationManagement() {
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                 <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={saving}>
-                  {saving ? "Saving..." : editing ? "Update Designation" : "Add Designation"}
+                  {saving ? "Saving..." : editing ? "Update designation" : "Add designation"}
                 </Button>
               </DialogFooter>
             </form>
@@ -591,12 +591,12 @@ export function DesignationManagement() {
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Designation Details</DialogTitle>
+            <DialogTitle>designation Details</DialogTitle>
             <DialogDescription>Read-only details</DialogDescription>
           </DialogHeader>
           {viewRow && (
             <div className="space-y-3">
-              <p><strong>Designation:</strong> {viewRow.desgination || "—"}</p>
+              <p><strong>designation:</strong> {viewRow.designation || "—"}</p>
               <p><strong>Service Provider:</strong> {spName(viewRow)}</p>
               <p><strong>Company:</strong> {coName(viewRow)}</p>
               <p><strong>Branch:</strong> {brName(viewRow)}</p>
@@ -630,7 +630,7 @@ export function DesignationManagement() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icon icon="mdi:id-card" className="w-5 h-5" /> Designation List
+            <Icon icon="mdi:id-card" className="w-5 h-5" /> designation List
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 w-full overflow-x-auto">
@@ -640,7 +640,7 @@ export function DesignationManagement() {
             <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Designation</TableHead>
+                  <TableHead>designation</TableHead>
                   <TableHead>Service Provider</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Branch</TableHead>
@@ -661,7 +661,7 @@ export function DesignationManagement() {
                 ) : (
                   filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="whitespace-nowrap">{r.desgination || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{r.designation || "—"}</TableCell>
                       <TableCell className="whitespace-nowrap">{spName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{coName(r)}</TableCell>
                       <TableCell className="whitespace-nowrap">{brName(r)}</TableCell>

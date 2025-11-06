@@ -7,23 +7,36 @@ export class CreateGenerateSalaryDto {
   @Type(() => Number)
   @IsInt()
   serviceProviderID?: number;
-
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   companyID?: number;
-
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   branchesID?: number;
-
   @Type(() => Number)
   @IsInt()
   employeeID!: number; // required (FK to ManageEmployee)
-
-
-
+  @IsOptional()
   @IsString()
-  monthPeriod:string
+  monthPeriod: string;
+  @IsString()
+  @IsOptional()
+  paymentMode?: string;
+  @IsString()
+  @IsOptional()
+  paymentType: string;
+  @IsString()
+  @IsOptional()
+  paymentDate: string;
+  @IsString()
+  @IsOptional()
+  paymentRemark: string;
+  @IsString()
+  @IsOptional()
+  paymentProof: string;
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

@@ -276,7 +276,7 @@ CREATE TABLE "public"."Designations" (
     "serviceProviderID" INTEGER,
     "companyID" INTEGER,
     "branchesID" INTEGER,
-    "desgination" VARCHAR,
+    "designation" VARCHAR,
 
     CONSTRAINT "Designations_pkey" PRIMARY KEY ("id")
 );

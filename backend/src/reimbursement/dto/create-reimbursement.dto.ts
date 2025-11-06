@@ -5,10 +5,20 @@ export class CreateReimbursementDto {
   manageEmployeeID?: number;
   date?: string;
   status?: string;
+  
+  // Approval fields
   approvalType?: string;
-  salaryPeriod?: string; // Add this field
-  voucherCode?: string;  // Add this field
-  voucherDate?: string;  // Add this field
+  salaryPeriod?: string;
+  voucherCode?: string;
+  voucherDate?: string;
+  
+  // Payment fields (NEW)
+  paymentMode?: string;
+  paymentType?: string;
+  paymentDate?: string;
+  paymentRemark?: string;
+  paymentProof?: string;
+  
   items?: ReimbursementItemDto[];
 }
 

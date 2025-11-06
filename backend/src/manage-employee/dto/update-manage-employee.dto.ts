@@ -7,6 +7,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { BankDetailsCreateDto } from './create-manage-employee.dto';
 
 export class EduUpdateDto {
   @IsOptional() @IsInt() id?: number; // present if updating
@@ -28,6 +29,16 @@ export class ExpUpdateDto {
   @IsOptional() @IsString() responsibility?: string;
   @IsOptional() @IsString() skill?: string;
 }
+
+// ---------- Bank Details DTO ----------
+export class BankDetailsUpdateDto {
+  @IsOptional() @IsString() bankName?: string;
+  @IsOptional() @IsString() bankBranchName?: string;
+  @IsOptional() @IsString() accNumber?: string;
+  @IsOptional() @IsString() ifscCode?: string;
+  @IsOptional() @IsString() upi?: string;
+}
+
 
 export class DevMapUpdateDto {
   @IsOptional() @IsInt() id?: number;   // present if updating
@@ -112,6 +123,16 @@ export class UpdateManageEmployeeDto {
   @ValidateNested({ each: true })
   @Type(() => DevMapUpdateDto)
   devices?: DevMapUpdateDto[];
+
+  @IsOptional() @IsArray()
+@ValidateNested({ each: true })
+@Type(() => BankDetailsCreateDto)
+bankDetails?: BankDetailsCreateDto[];
+
+@IsOptional() @IsArray()
+bankDetailsIdsToDelete?: number[];
+
+
 
   // Promotion (1:1)
   @IsOptional()

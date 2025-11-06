@@ -1,4 +1,12 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreatePublicHolidayDto } from './create-public-holiday.dto';
+import { IsOptional, IsInt, IsString, IsDateString } from "class-validator";
 
-export class UpdatePublicHolidayDto extends PartialType(CreatePublicHolidayDto) {}
+export class UpdatePublicHolidayDto {
+  @IsOptional() @IsInt() serviceProviderID?: number;
+  @IsOptional() @IsInt() companyID?: number;
+  @IsOptional() @IsInt() branchesID?: number;
+  @IsOptional() @IsInt() manageHolidayID?: number;
+  
+  @IsOptional() @IsString() financialYear?: string;
+  @IsOptional() @IsDateString() startDate?: Date;
+  @IsOptional() @IsDateString() endDate?: Date;
+}

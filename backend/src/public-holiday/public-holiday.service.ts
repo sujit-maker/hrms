@@ -36,12 +36,22 @@ export class PublicHolidayService {
     });
   }
 
-  update(id: number, data: UpdatePublicHolidayDto) {
-    return this.prisma.publicHoliday.update({
+ async update(id: number, data: UpdatePublicHolidayDto) {
+  try {
+    // Filter out undefined values to avoid Prisma errors
+    const updateData = Object.fromEntries(
+      Object.entries(data).filter(([_, value]) => value !== undefined)
+    );
+    
+    return await this.prisma.publicHoliday.update({
       where: { id },
-      data,
+      data: updateData,
     });
+  } catch (error) {
+    console.error('Error updating public holiday:', error);
+    throw new Error('Failed to update public holiday');
   }
+}
 
   remove(id: number) {
     return this.prisma.$transaction(async (prisma) => {

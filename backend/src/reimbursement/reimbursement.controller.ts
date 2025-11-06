@@ -61,6 +61,45 @@ export class ReimbursementController {
     return this.service.update(id, dto);
   }
 
+  @Patch(':id/payment')
+async updatePayment(
+  @Param('id') id: string,
+  @Body() paymentData: {
+    paymentMode?: string;
+    paymentType?: string;
+    paymentDate?: string;
+    paymentRemark?: string;
+    paymentProof?: string;
+    status?: string;
+  }
+) {
+  return this.service.updatePayment(+id, paymentData);
+}
+
+@Patch(':id/approval')
+async updateApproval(
+  @Param('id') id: string,
+  @Body() approvalData: {
+    approvalType?: string;
+    salaryPeriod?: string;
+    voucherCode?: string;
+    voucherDate?: string;
+    status?: string;
+  }
+) {
+  return this.service.updateApproval(+id, approvalData);
+}
+
+@Get('status/:status')
+async findByStatus(@Param('status') status: string) {
+  return this.service.findByStatus(status);
+}
+
+@Get('approval-type/:type')
+async findByApprovalType(@Param('type') type: string) {
+  return this.service.findByApprovalType(type);
+}
+
   // ❌ Delete reimbursement
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
